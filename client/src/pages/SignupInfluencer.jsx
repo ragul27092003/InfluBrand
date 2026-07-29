@@ -1,0 +1,353 @@
+import { useRef, useState } from "react";
+import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
+import { Sparkles, ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { StepProgress } from "@/components/site/StepProgress";
+import { auth } from "@/lib/api";
+import { useAuth } from "@/lib/AuthContext";
+import { CATEGORIES, CITIES, PLATFORMS } from "@/lib/catalog";
+
+const STEPS = ["Basic info", "Socials", "Niche & pricing", "Verify"];
+const PLATFORM_LABELS = { instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok" };
+
+function Field({ label, required, children }) {
+  return (
+    <div className="space-y-2">
+      <Label>
+        {label}
+        {required && <span className="text-primary"> *</span>}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+function readAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+export default function SignupInfluencer() {
+  const navigate = useNavigate();
+  const { refreshUser } = useAuth();
+  const fileRef = useRef(null);
+  const [step, setStep] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    password: "",
+    city: CITIES[0],
+    gender: "female",
+    handle: "",
+    platform: PLATFORMS[0],
+    followers: "",
+    startingPrice: "",
+  });
+
+  function set(key, value) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function toggleCategory(cat) {
+    setCategories((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat].slice(0, 5)
+    );
+  }
+
+  async function handleAvatarChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const dataUrl = await readAsDataUrl(file);
+    setAvatarPreview(dataUrl);
+  }
+
+  function goNext(e) {
+    e.preventDefault();
+    if (step === 1) {
+      if (!form.full_name || !form.email || !form.password) {
+        toast.error("Please fill in your name, email and password.");
+        return;
+      }
+      if (form.password.length < 6) {
+        toast.error("Password must be at least 6 characters.");
+        return;
+      }
+    }
+    if (step === 2 && !form.handle) {
+      toast.error("Please add your handle for the selected platform.");
+      return;
+    }
+    if (step === 3 && categories.length === 0) {
+      toast.error("Pick at least one content category.");
+      return;
+    }
+    setStep((s) => s + 1);
+  }
+
+  function sendOtp() {
+    setSendingOtp(true);
+    setTimeout(() => {
+      setOtpSent(true);
+      setSendingOtp(false);
+      toast.success(`Verification code sent to ${form.email}`);
+    }, 700);
+  }
+
+  async function handleVerifyAndSubmit(e) {
+    e.preventDefault();
+    if (!otpSent) {
+      sendOtp();
+      return;
+    }
+    if (otp.trim().length !== 6) {
+      toast.error("Enter the 6-digit code we sent you.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await auth.signup({
+        email: form.email,
+        password: form.password,
+        accountType: "influencer",
+        fullName: form.full_name,
+        phone: form.phone,
+        handle: form.handle,
+        platform: form.platform,
+        gender: form.gender,
+        city: form.city,
+        categories,
+        avatarUrl: avatarPreview,
+        followers: form.followers,
+        startingPrice: form.startingPrice,
+      });
+      await refreshUser();
+      toast.success("Profile created. Complete your details to go live!");
+      navigate("/dashboard");
+    } catch (err) {
+      toast.error(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="relative overflow-hidden">
+      <div className="hero-glow absolute inset-0" />
+      <div className="relative mx-auto w-full max-w-2xl px-4 py-16">
+        <div className="surface-panel p-8">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[image:var(--gradient-mint)] text-primary-foreground">
+            <Sparkles className="size-5" />
+          </span>
+          <h1 className="mt-4 font-display text-3xl font-bold">Join as an influencer</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Create your creator profile and start receiving collaboration offers.
+          </p>
+
+          <div className="mt-8">
+            <StepProgress steps={STEPS} current={step} />
+          </div>
+
+          {step === 1 && (
+            <form className="mt-8 grid gap-4 sm:grid-cols-2" onSubmit={goNext}>
+              <div className="flex flex-col items-center gap-3 sm:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-border bg-muted/40 hover:border-primary/60"
+                >
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="Avatar preview" className="h-full w-full object-cover" />
+                  ) : (
+                    <Sparkles className="size-8 text-muted-foreground" />
+                  )}
+                </button>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+                <p className="text-xs text-muted-foreground">Upload a profile photo (optional)</p>
+              </div>
+              <Field label="Full name" required>
+                <Input required value={form.full_name} onChange={(e) => set("full_name", e.target.value)} placeholder="Aarav Mehta" />
+              </Field>
+              <Field label="Email" required>
+                <Input required type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="you@gmail.com" />
+              </Field>
+              <Field label="Phone">
+                <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+91 98765 43210" />
+              </Field>
+              <Field label="City">
+                <Select value={form.city} onValueChange={(v) => set("city", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Gender">
+                <Select value={form.gender} onValueChange={(v) => set("gender", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Password" required>
+                <Input required type="password" minLength={6} value={form.password} onChange={(e) => set("password", e.target.value)} placeholder="At least 6 characters" />
+              </Field>
+              <div className="sm:col-span-2">
+                <Button variant="hero" size="lg" className="w-full" type="submit">
+                  Continue <ArrowRight className="size-4" />
+                </Button>
+                <p className="mt-4 text-center text-sm text-muted-foreground">
+                  Already registered?{" "}
+                  <Link to="/auth" className="text-primary hover:underline">Log in</Link>
+                </p>
+              </div>
+            </form>
+          )}
+
+          {step === 2 && (
+            <form className="mt-8 grid gap-4 sm:grid-cols-2" onSubmit={goNext}>
+              <Field label="Primary platform">
+                <Select value={form.platform} onValueChange={(v) => set("platform", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PLATFORMS.map((p) => (
+                      <SelectItem key={p} value={p}>{PLATFORM_LABELS[p]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Handle" required>
+                <Input required value={form.handle} onChange={(e) => set("handle", e.target.value)} placeholder="@yourhandle" />
+              </Field>
+              <Field label="Followers">
+                <Input type="number" value={form.followers} onChange={(e) => set("followers", e.target.value)} placeholder="124000" />
+              </Field>
+              <div className="flex gap-3 sm:col-span-2">
+                <Button type="button" variant="outline" size="lg" onClick={() => setStep(1)}>
+                  <ArrowLeft className="size-4" /> Back
+                </Button>
+                <Button variant="hero" size="lg" className="flex-1" type="submit">
+                  Continue <ArrowRight className="size-4" />
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {step === 3 && (
+            <form className="mt-8 space-y-5" onSubmit={goNext}>
+              <div>
+                <Label>Content categories (up to 5)</Label>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {CATEGORIES.map((cat) => {
+                    const active = categories.includes(cat);
+                    return (
+                      <button
+                        type="button"
+                        key={cat}
+                        onClick={() => toggleCategory(cat)}
+                        className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                          active
+                            ? "border-transparent bg-[image:var(--gradient-mint)] text-primary-foreground"
+                            : "border-border text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <Field label="Starting price (₹)">
+                <Input type="number" value={form.startingPrice} onChange={(e) => set("startingPrice", e.target.value)} placeholder="25000" />
+              </Field>
+              <div className="flex gap-3">
+                <Button type="button" variant="outline" size="lg" onClick={() => setStep(2)}>
+                  <ArrowLeft className="size-4" /> Back
+                </Button>
+                <Button variant="hero" size="lg" className="flex-1" type="submit">
+                  Continue <ArrowRight className="size-4" />
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {step === 4 && (
+            <form className="mt-8 space-y-5" onSubmit={handleVerifyAndSubmit}>
+              <div className="flex flex-col items-center rounded-xl border border-border bg-muted/30 p-6 text-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[image:var(--gradient-mint)] text-primary-foreground">
+                  <ShieldCheck className="size-6" />
+                </span>
+                <p className="mt-3 font-display text-lg font-semibold">Verify your email</p>
+                <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+                  {otpSent
+                    ? `Enter the 6-digit code we sent to ${form.email}.`
+                    : `We'll send a 6-digit verification code to ${form.email || "your email"}.`}
+                </p>
+
+                {otpSent ? (
+                  <Input
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    placeholder="123456"
+                    className="mt-4 w-40 text-center tracking-[0.4em]"
+                  />
+                ) : null}
+
+                {otpSent && (
+                  <button
+                    type="button"
+                    onClick={sendOtp}
+                    disabled={sendingOtp}
+                    className="mt-3 text-xs text-primary hover:underline"
+                  >
+                    Resend code
+                  </button>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <Button type="button" variant="outline" size="lg" onClick={() => setStep(3)}>
+                  <ArrowLeft className="size-4" /> Back
+                </Button>
+                <Button variant="hero" size="lg" className="flex-1" type="submit" disabled={busy || sendingOtp}>
+                  {busy
+                    ? "Creating profile…"
+                    : otpSent
+                    ? "Verify & create profile"
+                    : sendingOtp
+                    ? "Sending code…"
+                    : "Send verification code"}
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
