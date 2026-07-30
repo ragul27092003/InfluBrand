@@ -69,21 +69,27 @@ export function DashboardLayout() {
 
   return (
     <div className="dash-light flex min-h-[calc(100vh-4rem)] flex-col bg-background text-foreground">
-      {/* Identity row */}
-      <div className="border-b border-border bg-card">
+      {/* Identity row — clean, quiet, JPMorgan-style restraint */}
+      <div className="border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <Logo />
           <div className="flex items-center gap-5">
-            <a href="#" className="hidden items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary sm:flex">
+            <a
+              href="#"
+              className="hidden items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:flex"
+            >
               <Headphones className="size-4" />
               Support
             </a>
-            <button className="flex items-center gap-2 text-sm font-medium">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[image:var(--gradient-mint)] text-xs font-bold text-primary-foreground">
-                {displayName.slice(0, 1).toUpperCase()}
+            <button className="group flex items-center gap-2.5 rounded-full border border-transparent py-1 pr-1 pl-1.5 text-sm font-medium transition-colors hover:border-border">
+              <span
+                className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold"
+                style={{ background: "var(--gradient-ink)" }}
+              >
+                <span className="text-gold">{displayName.slice(0, 1).toUpperCase()}</span>
               </span>
-              {displayName}
-              <ChevronDown className="size-3.5 text-muted-foreground" />
+              <span className="hidden sm:inline">{displayName}</span>
+              <ChevronDown className="size-3.5 text-muted-foreground transition-transform group-hover:translate-y-0.5" />
             </button>
             <button
               className="rounded-md border border-border p-1.5 lg:hidden"
@@ -96,19 +102,21 @@ export function DashboardLayout() {
         </div>
       </div>
 
-      {/* Signature stat ribbon — ink block, huge condensed numbers */}
-      <div className="relative overflow-hidden bg-[var(--ink)]">
+      {/* Signature stat ribbon — deep ink block, oversized condensed numerals (Nike),
+          a single hairline gold rule underneath for quiet authority (JPMorgan). */}
+      <div className="relative overflow-hidden" style={{ background: "var(--gradient-ink)" }}>
         <div
           className="absolute inset-y-0 right-0 w-1/3"
-          style={{ background: "var(--gradient-mint)", opacity: 0.14, clipPath: "polygon(30% 0, 100% 0, 100% 100%, 0 100%)" }}
+          style={{ background: "var(--gradient-mint)", opacity: 0.1, clipPath: "polygon(30% 0, 100% 0, 100% 100%, 0 100%)" }}
         />
-        <div className="relative mx-auto flex w-full max-w-7xl flex-wrap items-end justify-between gap-6 px-4 py-6 sm:px-6">
+        <div className="relative mx-auto flex w-full max-w-7xl flex-wrap items-end justify-between gap-6 px-4 py-7 sm:px-6">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/40">
+            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-white/45">
+              <span className="h-px w-6" style={{ background: "var(--gradient-gold)" }} />
               {isBrand ? "Brand account" : "Creator account"}
             </p>
-            <h1 className="mt-1 font-display text-2xl font-bold text-white sm:text-3xl">
-              Hi {firstName}
+            <h1 className="mt-2 font-display text-3xl font-bold text-white sm:text-4xl">
+              Hi, {firstName}.
             </h1>
           </div>
 
@@ -117,7 +125,7 @@ export function DashboardLayout() {
               <div key={s.label}>
                 <p
                   className="leading-none text-[var(--volt)]"
-                  style={{ fontFamily: "var(--font-impact)", fontSize: "clamp(2.5rem, 5vw, 3.5rem)" }}
+                  style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.25rem, 4.5vw, 3.25rem)", fontWeight: 700, letterSpacing: "-0.03em" }}
                 >
                   {s.value}
                 </p>
@@ -136,11 +144,16 @@ export function DashboardLayout() {
             )}
           </div>
         </div>
+        <div className="h-px w-full" style={{ background: "var(--gradient-gold)", opacity: 0.7 }} />
       </div>
 
-      {/* Thin underline nav */}
+      {/* Nav — bold uppercase pills instead of a thin underline row */}
       <div className="border-b border-border bg-card">
-        <nav className={`mx-auto w-full max-w-7xl px-4 sm:px-6 ${mobileOpen ? "flex" : "hidden"} lg:flex flex-col lg:flex-row lg:items-center`}>
+        <nav
+          className={`mx-auto flex w-full max-w-7xl gap-1 overflow-x-auto px-4 py-2.5 sm:px-6 ${
+            mobileOpen ? "flex" : "hidden"
+          } lg:flex flex-col lg:flex-row lg:items-center`}
+        >
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -148,10 +161,10 @@ export function DashboardLayout() {
               end={item.end}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-1 border-b-2 px-4 py-3.5 text-xs font-bold uppercase tracking-wider transition-colors ${
+                `flex items-center gap-1 whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
                   isActive
-                    ? "border-[var(--volt)] text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
+                    ? "bg-foreground text-background shadow-sm"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                 }`
               }
             >
@@ -161,7 +174,7 @@ export function DashboardLayout() {
           ))}
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 border-b-2 border-transparent px-4 py-3.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground lg:ml-auto"
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground lg:ml-auto"
           >
             <LogOut className="size-3.5" />
             Log out

@@ -45,21 +45,28 @@ function readAsDataUrl(file) {
 function AvatarUpload({ preview, onChange, icon: Icon }) {
   const fileRef = useRef(null);
   return (
-    <div className="mb-2 flex items-center gap-4">
+    <div className="mb-3 flex items-center gap-5 rounded-2xl border border-border bg-muted/20 p-4">
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
-        className="group relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-border bg-muted/40 hover:border-primary/60"
+        className="group relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-border bg-card transition-colors hover:border-primary/60"
       >
         {preview ? (
           <img src={preview} alt="Preview" className="h-full w-full object-cover" />
         ) : (
           <Icon className="size-7 text-muted-foreground" />
         )}
-        <span className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-[image:var(--gradient-mint)] text-primary-foreground">
-          <Camera className="size-3.5" />
+        <span
+          className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full text-primary-foreground shadow-sm"
+          style={{ background: "var(--gradient-ink)" }}
+        >
+          <Camera className="size-3.5 text-gold" />
         </span>
       </button>
+      <div>
+        <p className="text-sm font-semibold">Profile photo</p>
+        <p className="text-xs text-muted-foreground">Click the circle to upload — square images work best.</p>
+      </div>
       <input
         ref={fileRef}
         type="file"
@@ -71,7 +78,6 @@ function AvatarUpload({ preview, onChange, icon: Icon }) {
           onChange(await readAsDataUrl(file));
         }}
       />
-      <p className="text-xs text-muted-foreground">Click the circle to upload a photo</p>
     </div>
   );
 }
@@ -136,8 +142,14 @@ function BrandProfile({ user }) {
   }
 
   return (
-    <div className="surface-panel p-6 sm:p-8">
-      <form onSubmit={handleSave} className="space-y-5">
+    <div className="surface-panel surface-panel-hover overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gold" style={{ background: "var(--gradient-ink)" }}>
+          <Building2 className="size-4" />
+        </span>
+        <h3 className="font-display text-lg font-bold">Brand Profile</h3>
+      </div>
+      <form onSubmit={handleSave} className="space-y-5 p-6 sm:p-8">
         <AvatarUpload
           preview={form.logoUrl}
           onChange={(dataUrl) => setForm((p) => ({ ...p, logoUrl: dataUrl }))}
@@ -187,6 +199,7 @@ function BrandProfile({ user }) {
     </div>
   );
 }
+// ⬆ closes BrandProfile's surface-panel wrapper
 
 // ---- Influencer profile: multi-section layout ----
 // Only "Basic Profile" is fully wired up right now. The rest are placeholders
@@ -208,7 +221,8 @@ const PROFILE_SECTIONS = [
 
 function ComingSoon({ label }) {
   return (
-    <div className="surface-panel flex flex-col items-center gap-2 p-10 text-center">
+    <div className="surface-panel flex flex-col items-center gap-3 p-12 text-center">
+      <span className="h-px w-10" style={{ background: "var(--gradient-gold)" }} />
       <p className="font-display text-base font-semibold">{label}</p>
       <p className="max-w-sm text-sm text-muted-foreground">
         This section hasn't been built out yet — send over what it should contain and it'll be
@@ -352,9 +366,9 @@ function BasicProfileForm({ user }) {
                 type="button"
                 key={cat}
                 onClick={() => toggleCat(cat)}
-                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                   active
-                    ? "border-transparent bg-[image:var(--gradient-mint)] text-primary-foreground"
+                    ? "border-transparent bg-foreground text-background"
                     : "border-border text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -396,19 +410,20 @@ function InfluencerProfile({ user }) {
   const active = PROFILE_SECTIONS.find((s) => s.key === section);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap gap-2">
+    <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+      {/* Section rail — quiet ink pills on desktop, scrollable chips on mobile */}
+      <div className="surface-panel flex gap-1.5 overflow-x-auto p-2 lg:flex-col lg:overflow-visible">
         {PROFILE_SECTIONS.map((s) => (
           <button
             key={s.key}
             onClick={() => setSection(s.key)}
-            className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+            className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold transition-all lg:w-full ${
               section === s.key
-                ? "border-transparent bg-[image:var(--gradient-mint)] text-primary-foreground"
-                : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                ? "bg-foreground text-background shadow-sm"
+                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
             }`}
           >
-            <s.icon className="size-3.5" />
+            <s.icon className="size-4 shrink-0" />
             {s.label}
           </button>
         ))}
@@ -416,9 +431,19 @@ function InfluencerProfile({ user }) {
 
       <div>
         {section === "basic" ? (
-          <div className="surface-panel p-6 sm:p-8">
-            <h3 className="mb-6 font-display text-lg font-bold">Basic Profile</h3>
-            <BasicProfileForm user={user} />
+          <div className="surface-panel overflow-hidden">
+            <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+              <span
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-gold"
+                style={{ background: "var(--gradient-ink)" }}
+              >
+                <UserRound className="size-4" />
+              </span>
+              <h3 className="font-display text-lg font-bold">Basic Profile</h3>
+            </div>
+            <div className="p-6 sm:p-8">
+              <BasicProfileForm user={user} />
+            </div>
           </div>
         ) : (
           <ComingSoon label={active.label} />
@@ -433,7 +458,13 @@ export default function DashProfile() {
 
   return (
     <div className="space-y-6">
-      <h2 className="font-display text-2xl font-bold">My Profile</h2>
+      <div>
+        <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+          <span className="h-px w-6" style={{ background: "var(--gradient-gold)" }} />
+          Account
+        </p>
+        <h2 className="mt-1 font-display text-2xl font-bold">My Profile</h2>
+      </div>
       {accountType === "brand" ? (
         <BrandProfile user={user} />
       ) : (

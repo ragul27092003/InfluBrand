@@ -94,8 +94,11 @@ export default function Dashboard() {
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-3">
         {stats.map((s) => (
-          <div key={s.label} className="surface-panel flex items-center gap-4 p-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[image:var(--gradient-mint)] text-primary-foreground">
+          <div key={s.label} className="surface-panel surface-panel-hover flex items-center gap-4 p-5">
+            <div
+              className="flex h-11 w-11 items-center justify-center rounded-xl text-gold"
+              style={{ background: "var(--gradient-ink)" }}
+            >
               <s.icon className="size-5" />
             </div>
             <div>
