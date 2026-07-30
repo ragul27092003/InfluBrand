@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { InfluencerCard } from "@/components/site/InfluencerCard";
 import { influencers as influencersApi, shortlists } from "@/lib/api";
 import { CATEGORIES, CITIES, PLATFORMS, formatCount, formatRupees, derivedRating } from "@/lib/catalog";
 import { useAuth } from "@/lib/AuthContext";
+import { Reveal, RevealGroup, RevealItem } from "@/components/motion/Reveal";
 
 const PLATFORM_LABEL = { instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok" };
 const MAX_FOLLOWERS = 1000000;
@@ -176,22 +178,40 @@ export default function Influencers() {
       <section className="relative overflow-hidden border-b border-border/60">
         <div className="hero-glow absolute inset-0" />
         <div className="relative mx-auto w-full max-w-7xl px-4 py-14 sm:px-6">
-          <span
+          <motion.span
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
             className="inline-flex items-center rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-gold"
             style={{ background: "var(--gradient-ink)" }}
           >
             Creator directory
-          </span>
-          <h1 className="mt-5 max-w-2xl font-display text-3xl font-extrabold tracking-tight sm:text-5xl">
+          </motion.span>
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-5 max-w-2xl font-display text-3xl font-extrabold tracking-tight sm:text-5xl"
+          >
             Find <span className="text-gradient">influencers</span> for every
             niche
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-3 max-w-2xl text-sm text-muted-foreground"
+          >
             A handpicked directory of Indian creators — filter by category, city and engagement to
             find the right voice for your campaign.
-          </p>
+          </motion.p>
 
-          <div className="mt-6 flex max-w-xl items-center gap-2">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-6 flex max-w-xl items-center gap-2"
+          >
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -204,12 +224,18 @@ export default function Influencers() {
             <Button variant="hero" asChild>
               <Link to="/signup/brand">Start a campaign</Link>
             </Button>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[260px_1fr]">
-        <aside className="space-y-6">
+        <motion.aside
+          initial={{ opacity: 0, x: -24 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, amount: 0.1 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="space-y-6"
+        >
           <FilterGroup
             title="Filter by category"
             options={["All", ...CATEGORIES]}
@@ -246,7 +272,7 @@ export default function Influencers() {
               <Link to="/signup/influencer">Sign up as an influencer</Link>
             </Button>
           </div>
-        </aside>
+        </motion.aside>
 
         <main>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -281,17 +307,18 @@ export default function Influencers() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            <RevealGroup className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3" stagger={0.06} amount={0.05}>
               {results.map((influencer) => (
-                <InfluencerCard
-                  key={influencer.id || influencer._id}
-                  influencer={influencer}
-                  busy={busyId === (influencer.id || influencer._id)}
-                  onShortlist={(inf) => addToList(inf, "shortlist")}
-                  onOffer={(inf) => addToList(inf, "offer")}
-                />
+                <RevealItem key={influencer.id || influencer._id} scale>
+                  <InfluencerCard
+                    influencer={influencer}
+                    busy={busyId === (influencer.id || influencer._id)}
+                    onShortlist={(inf) => addToList(inf, "shortlist")}
+                    onOffer={(inf) => addToList(inf, "offer")}
+                  />
+                </RevealItem>
               ))}
-            </div>
+            </RevealGroup>
           )}
         </main>
       </div>

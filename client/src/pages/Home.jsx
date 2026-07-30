@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
+import { motion } from "framer-motion";
 import {
   ArrowRight,
   BarChart3,
@@ -20,6 +21,9 @@ import {
 import { InfluencerCard } from "@/components/site/InfluencerCard";
 import { influencers as influencersApi } from "@/lib/api";
 import { CATEGORIES, CITIES } from "@/lib/catalog";
+import { Reveal, RevealGroup, RevealItem } from "@/components/motion/Reveal";
+import { Parallax, FloatingBlob } from "@/components/motion/Parallax";
+import { AnimatedCounter } from "@/components/motion/AnimatedCounter";
 import heroImage from "@/assets/hero-creator.jpg";
 import ctaBrand from "@/assets/cta-brand.jpg";
 import ctaInfluencer from "@/assets/cta-influencer.jpg";
@@ -84,10 +88,12 @@ const TESTIMONIALS = [
 
 const BRAND_STRIP = ["Nova Skincare", "Urban Roots", "Chai Point", "Bloom & Co", "Fitrite", "Wander India"];
 
-function Metric({ value, label }) {
+function Metric({ value, suffix, label }) {
   return (
     <div>
-      <dt className="font-display text-3xl font-bold text-primary">{value}</dt>
+      <dt className="font-display text-3xl font-bold text-primary">
+        <AnimatedCounter value={value} suffix={suffix} />
+      </dt>
       <dd className="text-xs text-muted-foreground">{label}</dd>
     </div>
   );
@@ -95,32 +101,34 @@ function Metric({ value, label }) {
 
 function SectionHeading({ eyebrow, title, copy }) {
   return (
-    <div className="max-w-2xl">
-      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">
-        <span className="h-px w-6" style={{ background: "var(--gradient-gold)" }} />
-        {eyebrow}
-      </p>
+    <Reveal className="max-w-2xl">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
       <h2 className="mt-3 font-display text-3xl font-bold sm:text-4xl">{title}</h2>
       {copy && <p className="mt-3 text-sm text-muted-foreground">{copy}</p>}
-    </div>
+    </Reveal>
   );
 }
 
 function CtaCard({ image, alt, eyebrow, title, copy, to, cta }) {
   return (
-    <div className="surface-panel surface-panel-hover relative overflow-hidden">
-      <div className="relative">
-        <img src={image} alt={alt} loading="lazy" width={1200} height={800} className="h-44 w-full object-cover" />
-        <div className="absolute inset-0" style={{ background: "linear-gradient(0deg, oklch(0.16 0.02 250 / 0.55) 0%, transparent 60%)" }} />
-        <span
-          className="absolute bottom-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-gold"
-          style={{ background: "var(--gradient-ink)" }}
-        >
-          {eyebrow}
-        </span>
+    <div className="surface-panel relative overflow-hidden">
+      <div className="overflow-hidden">
+        <motion.img
+          src={image}
+          alt={alt}
+          loading="lazy"
+          width={1200}
+          height={800}
+          className="h-44 w-full object-cover opacity-70"
+          initial={{ scale: 1.15 }}
+          whileInView={{ scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+        />
       </div>
       <div className="p-7">
-        <h3 className="font-display text-2xl font-bold">{title}</h3>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
+        <h3 className="mt-2 font-display text-2xl font-bold">{title}</h3>
         <p className="mt-2 text-sm text-muted-foreground">{copy}</p>
         <Button variant="hero" className="mt-5" asChild>
           <Link to={to}>{cta}</Link>
@@ -149,26 +157,54 @@ export default function Home() {
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-border/60">
         <div className="hero-glow absolute inset-0" />
+        <FloatingBlob
+          className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-[image:var(--gradient-mint)] opacity-20 blur-3xl"
+          duration={16}
+        />
+        <FloatingBlob
+          className="pointer-events-none absolute -right-16 top-40 h-64 w-64 rounded-full bg-primary/30 opacity-20 blur-3xl"
+          duration={12}
+          delay={2}
+        />
         <div className="relative mx-auto grid w-full max-w-7xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
-          <div>
-            <span
-              className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-gold"
-              style={{ background: "var(--gradient-ink)" }}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <motion.span
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground"
             >
-              <Sparkles className="size-3.5" /> India&rsquo;s creator marketplace
-            </span>
-            <h1 className="mt-6 font-display text-4xl font-extrabold leading-[0.98] tracking-tight sm:text-6xl lg:text-7xl">
-              DRIVE
+              <Sparkles className="size-3.5 text-primary" /> India&rsquo;s creator marketplace
+            </motion.span>
+            <motion.h1
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.2 }}
+              className="mt-5 font-display text-4xl font-extrabold leading-[1.05] sm:text-5xl lg:text-6xl"
+            >
+              Drive influence,
               <br />
-              INFLUENCE.
-              <br />
-              <span className="text-gradient">DRIVE RESULTS.</span>
-            </h1>
-            <p className="mt-5 max-w-lg text-base text-muted-foreground">
+              <span className="text-gradient">drive results.</span>
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.3 }}
+              className="mt-5 max-w-lg text-base text-muted-foreground"
+            >
               Influbrand helps brands and agencies partner with Indian creators across fashion,
               food, tech and more — with measurable engagement, not guesswork.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.4 }}
+              className="mt-8 flex flex-wrap gap-3"
+            >
               <Button variant="hero" size="lg" asChild>
                 <Link to="/signup/brand">
                   Start a campaign <ArrowRight className="size-4" />
@@ -177,52 +213,57 @@ export default function Home() {
               <Button variant="outline" size="lg" asChild>
                 <Link to="/influencers">Browse influencers</Link>
               </Button>
-            </div>
-            <dl className="mt-10 grid max-w-md grid-cols-3 gap-6 border-t border-border pt-6">
-              <Metric value="875+" label="Collaborations" />
-              <Metric value="6.0K+" label="Creators" />
-              <Metric value="18" label="Cities" />
-            </dl>
-          </div>
+            </motion.div>
+            <motion.dl
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.5 }}
+              className="mt-10 grid max-w-md grid-cols-3 gap-6"
+            >
+              <Metric value={875} suffix="+" label="Collaborations" />
+              <Metric value={6.0} suffix="K+" label="Creators" />
+              <Metric value={18} suffix="" label="Cities" />
+            </motion.dl>
+          </motion.div>
 
-          <div className="relative">
-            <div className="absolute -inset-6 rounded-[3rem] bg-[image:var(--gradient-mint)] opacity-20 blur-3xl" />
-            <img
+          <Parallax speed={0.15} className="relative">
+            <motion.div
+              className="absolute -inset-6 rounded-[3rem] bg-[image:var(--gradient-mint)] opacity-20 blur-3xl"
+              animate={{ opacity: [0.15, 0.28, 0.15] }}
+              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <motion.img
               src={heroImage}
               alt="Indian content creator filming a brand campaign video"
               width={1200}
               height={1408}
+              initial={{ opacity: 0, scale: 0.92, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.9, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
               className="relative w-full rounded-[2rem] border border-border object-cover shadow-[var(--shadow-glow)]"
             />
-            <div
-              className="absolute -bottom-5 -left-5 hidden rounded-2xl px-5 py-4 text-white shadow-[var(--shadow-premium)] sm:block"
-              style={{ background: "var(--gradient-ink)" }}
-            >
-              <p className="font-display text-2xl font-bold text-gold">4.9<span className="text-sm">/5</span></p>
-              <p className="text-[11px] uppercase tracking-wider text-white/60">Avg. brand rating</p>
-            </div>
-          </div>
+          </Parallax>
         </div>
       </section>
 
       {/* As seen in / trusted by strip */}
-      <section className="relative overflow-hidden border-b border-border/60" style={{ background: "var(--gradient-ink)" }}>
+      <section className="border-b border-border/60 bg-muted/20">
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
-          <p className="text-center text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
-            Trusted by brands across India
-          </p>
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
+          <Reveal>
+            <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Trusted by brands across India
+            </p>
+          </Reveal>
+          <RevealGroup className="mt-5 flex flex-wrap items-center justify-center gap-x-10 gap-y-4" stagger={0.06}>
             {BRAND_STRIP.map((brand) => (
-              <span
-                key={brand}
-                className="font-display text-lg font-bold text-white/40 transition-colors hover:text-gold"
-              >
-                {brand}
-              </span>
+              <RevealItem key={brand} direction="up">
+                <span className="font-display text-lg font-bold text-muted-foreground/60 grayscale transition-colors hover:text-foreground">
+                  {brand}
+                </span>
+              </RevealItem>
             ))}
-          </div>
+          </RevealGroup>
         </div>
-        <div className="h-px w-full" style={{ background: "var(--gradient-gold)", opacity: 0.6 }} />
       </section>
 
       {/* Steps */}
@@ -232,21 +273,24 @@ export default function Home() {
           title="Launch a campaign in 4 steps"
           copy="From brief to published content, every stage lives in one dashboard."
         />
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <RevealGroup className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" stagger={0.1}>
           {STEPS.map((step, i) => (
-            <div key={step.title} className="surface-panel surface-panel-hover p-6">
-              <div
-                className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl text-gold"
-                style={{ background: "var(--gradient-ink)" }}
+            <RevealItem key={step.title}>
+              <motion.div
+                whileHover={{ y: -6 }}
+                transition={{ duration: 0.25 }}
+                className="surface-panel h-full p-6"
               >
-                <step.icon className="size-5" />
-              </div>
-              <p className="font-display text-xs font-bold uppercase tracking-widest text-gold">Step {i + 1}</p>
-              <h3 className="mt-1 font-display text-lg font-semibold">{step.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{step.copy}</p>
-            </div>
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[image:var(--gradient-mint)] text-primary-foreground">
+                  <step.icon className="size-5" />
+                </div>
+                <p className="text-xs font-semibold text-primary">Step {i + 1}</p>
+                <h3 className="mt-1 font-display text-lg font-semibold">{step.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{step.copy}</p>
+              </motion.div>
+            </RevealItem>
           ))}
-        </div>
+        </RevealGroup>
       </section>
 
       {/* Featured creators */}
@@ -260,19 +304,21 @@ export default function Home() {
           {loading ? (
             <p className="mt-10 text-sm text-muted-foreground">Loading creators…</p>
           ) : (
-            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <RevealGroup className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3" stagger={0.08}>
               {featured.map((influencer) => (
-                <InfluencerCard key={influencer.id || influencer._id} influencer={influencer} actionLabel="View" />
+                <RevealItem key={influencer.id || influencer._id} scale>
+                  <InfluencerCard influencer={influencer} actionLabel="View" />
+                </RevealItem>
               ))}
-            </div>
+            </RevealGroup>
           )}
-          <div className="mt-10 text-center">
+          <Reveal className="mt-10 text-center">
             <Button variant="hero" size="lg" asChild>
               <Link to="/influencers">
                 See all influencers <ArrowRight className="size-4" />
               </Link>
             </Button>
-          </div>
+          </Reveal>
         </div>
       </section>
 
@@ -283,25 +329,24 @@ export default function Home() {
           title="Brands that grew with Influbrand"
           copy="A few words from marketing teams who launched campaigns on the platform."
         />
-        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <RevealGroup className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3" stagger={0.08}>
           {TESTIMONIALS.map((t) => (
-            <div key={t.name} className="surface-panel surface-panel-hover p-6">
-              <p className="text-sm text-foreground/90">&ldquo;{t.quote}&rdquo;</p>
-              <div className="mt-5 flex items-center gap-3">
-                <span
-                  className="flex h-9 w-9 items-center justify-center rounded-full font-display text-xs font-bold text-gold"
-                  style={{ background: "var(--gradient-ink)" }}
-                >
-                  {t.name.split(" ").map((n) => n[0]).join("")}
-                </span>
-                <div>
-                  <p className="text-sm font-semibold">{t.name}</p>
-                  <p className="text-xs text-muted-foreground">{t.role}</p>
+            <RevealItem key={t.name}>
+              <motion.div whileHover={{ y: -4 }} className="surface-panel h-full p-6">
+                <p className="text-sm text-foreground/90">&ldquo;{t.quote}&rdquo;</p>
+                <div className="mt-5 flex items-center gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[image:var(--gradient-mint)] font-display text-xs font-bold text-primary-foreground">
+                    {t.name.split(" ").map((n) => n[0]).join("")}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">{t.role}</p>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </motion.div>
+            </RevealItem>
           ))}
-        </div>
+        </RevealGroup>
       </section>
 
       {/* Services */}
@@ -311,86 +356,104 @@ export default function Home() {
           title="Bespoke influencer marketing"
           copy="Pick a single collaboration or a fully managed always-on programme."
         />
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <RevealGroup className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" stagger={0.08}>
           {SERVICES.map((service) => (
-            <div key={service.title} className="surface-panel surface-panel-hover p-6">
-              <service.icon className="size-6 text-gold" />
-              <h3 className="mt-4 font-display text-lg font-semibold">{service.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{service.copy}</p>
-            </div>
+            <RevealItem key={service.title}>
+              <motion.div whileHover={{ y: -6 }} className="surface-panel h-full p-6">
+                <service.icon className="size-6 text-primary" />
+                <h3 className="mt-4 font-display text-lg font-semibold">{service.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{service.copy}</p>
+              </motion.div>
+            </RevealItem>
           ))}
-        </div>
+        </RevealGroup>
       </section>
 
       {/* Categories & cities */}
       <section className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6">
-        <div className="surface-panel overflow-hidden">
-          <div className="px-8 py-6" style={{ background: "var(--gradient-ink)" }}>
-            <h2 className="font-display text-2xl font-bold text-white">Business segments and categories</h2>
-          </div>
-          <div className="p-8">
-            <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((cat) => (
+        <Reveal className="surface-panel p-8" scale>
+          <h2 className="font-display text-2xl font-bold">Business segments and categories</h2>
+          <div className="mt-6 flex flex-wrap gap-2">
+            {CATEGORIES.map((cat, i) => (
+              <motion.div
+                key={cat}
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.35, delay: i * 0.02 }}
+              >
                 <Link
-                  key={cat}
                   to={`/influencers?category=${encodeURIComponent(cat)}`}
-                  className="rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground transition-colors hover:border-transparent hover:bg-foreground hover:text-background"
+                  className="rounded-full border border-border bg-muted/30 px-4 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
                 >
                   {cat}
                 </Link>
-              ))}
-            </div>
-            <h3 className="mt-10 font-display text-xl font-semibold">Creators by city</h3>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {CITIES.map((city) => (
+              </motion.div>
+            ))}
+          </div>
+          <h3 className="mt-10 font-display text-xl font-semibold">Creators by city</h3>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {CITIES.map((city, i) => (
+              <motion.div
+                key={city}
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.35, delay: i * 0.02 }}
+              >
                 <Link
-                  key={city}
                   to={`/influencers?city=${encodeURIComponent(city)}`}
-                  className="rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground transition-colors hover:border-transparent hover:bg-foreground hover:text-background"
+                  className="rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
                 >
                   {city}
                 </Link>
-              ))}
-            </div>
+              </motion.div>
+            ))}
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* Dual CTA */}
-      <section className="mx-auto grid w-full max-w-7xl gap-5 px-4 pb-16 sm:px-6 md:grid-cols-2">
-        <CtaCard
-          image={ctaInfluencer}
-          alt="Travel creator filming content in India"
-          eyebrow="For creators"
-          title="Turn your audience into income"
-          copy="Join Influbrand to receive paid collaborations from brands in your niche."
-          to="/signup/influencer"
-          cta="Sign up as an influencer"
-        />
-        <CtaCard
-          image={ctaBrand}
-          alt="Beauty products styled for a brand campaign"
-          eyebrow="For brands"
-          title="Your next campaign starts here"
-          copy="Shortlist creators, send offers and track deliverables in one place."
-          to="/signup/brand"
-          cta="Start a campaign"
-        />
-      </section>
+      <RevealGroup className="mx-auto grid w-full max-w-7xl gap-5 px-4 pb-16 sm:px-6 md:grid-cols-2" stagger={0.12}>
+        <RevealItem direction="left">
+          <CtaCard
+            image={ctaInfluencer}
+            alt="Travel creator filming content in India"
+            eyebrow="For creators"
+            title="Turn your audience into income"
+            copy="Join Influbrand to receive paid collaborations from brands in your niche."
+            to="/signup/influencer"
+            cta="Sign up as an influencer"
+          />
+        </RevealItem>
+        <RevealItem direction="right">
+          <CtaCard
+            image={ctaBrand}
+            alt="Beauty products styled for a brand campaign"
+            eyebrow="For brands"
+            title="Your next campaign starts here"
+            copy="Shortlist creators, send offers and track deliverables in one place."
+            to="/signup/brand"
+            cta="Start a campaign"
+          />
+        </RevealItem>
+      </RevealGroup>
 
       {/* FAQ */}
       <section className="mx-auto w-full max-w-3xl px-4 pb-20 sm:px-6">
         <SectionHeading eyebrow="FAQ" title="Frequently asked questions" />
         <Accordion type="single" collapsible className="mt-8">
-          {FAQS.map((faq) => (
-            <AccordionItem key={faq.q} value={faq.q} className="surface-panel mb-3 px-5">
-              <AccordionTrigger className="text-left font-display text-base">
-                {faq.q}
-              </AccordionTrigger>
-              <AccordionContent className="text-sm text-muted-foreground">
-                {faq.a}
-              </AccordionContent>
-            </AccordionItem>
+          {FAQS.map((faq, i) => (
+            <Reveal key={faq.q} delay={i * 0.05}>
+              <AccordionItem value={faq.q} className="surface-panel mb-3 px-5">
+                <AccordionTrigger className="text-left font-display text-base">
+                  {faq.q}
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  {faq.a}
+                </AccordionContent>
+              </AccordionItem>
+            </Reveal>
           ))}
         </Accordion>
       </section>
