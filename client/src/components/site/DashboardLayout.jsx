@@ -117,7 +117,7 @@ export function DashboardLayout() {
     : isBrand
     ? [{ value: String(connectBalance ?? 0).padStart(2, "0"), label: "Connect balance" }]
     : [
-        { value: "0.0", label: "InfluGlue score" },
+        { value: "0.0", label: "InfluBrand score" },
         { value: "$0", label: "Account balance" },
       ];
 

@@ -17,6 +17,8 @@ import {
   Wallet,
   Gauge,
   Trash2,
+  Plus,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -238,7 +240,7 @@ function ComingSoon({ label }) {
   );
 }
 
-function BasicProfileForm({ user }) {
+function BasicProfileForm({ user, onProfileUpdate }) {
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -285,13 +287,14 @@ function BasicProfileForm({ user }) {
     e.preventDefault();
     setBusy(true);
     try {
-      await influencersApi.updateMe({
+      const updated = await influencersApi.updateMe({
         ...form,
         city: form.district,
         followers: form.followers ? Number(form.followers) : 0,
         startingPrice: form.startingPrice ? Number(form.startingPrice) : null,
         niches,
       });
+      if (onProfileUpdate) onProfileUpdate(updated);
       toast.success("Profile updated.");
     } catch (err) {
       toast.error(err.message || "Failed to update profile.");
@@ -383,11 +386,26 @@ function BasicProfileForm({ user }) {
 
 function InfluencerProfile({ user }) {
   const [section, setSection] = useState("basic");
+  const [profileData, setProfileData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    influencersApi
+      .me()
+      .then((data) => setProfileData(data))
+      .catch((err) => console.error("Failed to load profile:", err))
+      .finally(() => setLoading(false));
+  }, []);
+
   const active = PROFILE_SECTIONS.find((s) => s.key === section);
+
+  if (loading) {
+    return <p className="py-12 text-center text-sm text-muted-foreground animate-pulse">Loading profile…</p>;
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-      {/* Section rail — quiet ink pills on desktop, scrollable chips on mobile */}
+      {/* Section rail */}
       <div className="surface-panel flex gap-1.5 overflow-x-auto p-2 lg:flex-col lg:overflow-visible">
         {PROFILE_SECTIONS.map((s) => (
           <button
@@ -406,7 +424,7 @@ function InfluencerProfile({ user }) {
       </div>
 
       <div>
-        {section === "basic" ? (
+        {section === "basic" && (
           <div className="surface-panel overflow-hidden">
             <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
               <span
@@ -418,12 +436,599 @@ function InfluencerProfile({ user }) {
               <h3 className="font-display text-lg font-bold">Basic Profile</h3>
             </div>
             <div className="p-6 sm:p-8">
-              <BasicProfileForm user={user} />
+              <BasicProfileForm user={user} onProfileUpdate={setProfileData} />
             </div>
           </div>
-        ) : (
-          <ComingSoon label={active.label} />
         )}
+        {section === "about" && <AboutMeSection profileData={profileData} onUpdate={setProfileData} />}
+        {section === "brands" && <PreviousBrandsSection profileData={profileData} />}
+        {section === "samples" && <WorkSamplesSection profileData={profileData} onUpdate={setProfileData} />}
+        {section === "interests" && <InterestsSection profileData={profileData} onUpdate={setProfileData} />}
+        {section === "languages" && <LanguagesSection profileData={profileData} onUpdate={setProfileData} />}
+        {section === "social" && <SocialAssetsSection profileData={profileData} onUpdate={setProfileData} />}
+        {section === "rates" && <RatesSection profileData={profileData} onUpdate={setProfileData} />}
+        {section === "terms" && <TermsSection profileData={profileData} onUpdate={setProfileData} />}
+        {section === "payment" && <PaymentDetailsSection profileData={profileData} onUpdate={setProfileData} />}
+        {section === "score" && <ScoreSection profileData={profileData} />}
+        {section === "delete" && <DeleteAccountSection user={user} />}
+      </div>
+    </div>
+  );
+}
+
+// ---- Section Components ----
+
+function AboutMeSection({ profileData, onUpdate }) {
+  const [form, setForm] = useState({ aboutMe: profileData?.aboutMe || "" });
+  const [busy, setBusy] = useState(false);
+
+  async function handleSave() {
+    setBusy(true);
+    try {
+      const updated = await influencersApi.updateMe(form);
+      onUpdate(updated);
+      toast.success("About section updated");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="surface-panel overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gold" style={{ background: "var(--gradient-ink)" }}>
+          <FileText className="size-4" />
+        </span>
+        <h3 className="font-display text-lg font-bold">About Me</h3>
+      </div>
+      <div className="p-6 sm:p-8 space-y-4">
+        <Field label="Bio">
+          <Textarea
+            value={form.aboutMe}
+            onChange={(e) => setForm((p) => ({ ...p, aboutMe: e.target.value }))}
+            placeholder="Tell creators about yourself…"
+            rows={5}
+          />
+        </Field>
+        <div className="sm:pl-[180px]">
+          <Button variant="hero" onClick={handleSave} disabled={busy}>
+            <Save className="size-4" />
+            {busy ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PreviousBrandsSection({ profileData }) {
+  const brands = profileData?.previousBrands || [];
+
+  return (
+    <div className="surface-panel overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gold" style={{ background: "var(--gradient-ink)" }}>
+          <Briefcase className="size-4" />
+        </span>
+        <h3 className="font-display text-lg font-bold">Previous Brands</h3>
+      </div>
+      <div className="p-6 sm:p-8">
+        {brands.length === 0 ? (
+          <p className="text-center text-sm text-muted-foreground py-8">No previous brands added yet</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {brands.map((b, i) => (
+              <div key={i} className="rounded-lg border border-border p-3">
+                <p className="font-medium text-sm">{b.companyName || "Brand"}</p>
+                <p className="text-xs text-muted-foreground">{b.city || "—"}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WorkSamplesSection({ profileData, onUpdate }) {
+  const [samples, setSamples] = useState(profileData?.workSamples || []);
+  const [form, setForm] = useState({ title: "", url: "", description: "" });
+  const [busy, setBusy] = useState(false);
+
+  async function addSample() {
+    if (!form.title || !form.url) {
+      toast.error("Title and URL are required");
+      return;
+    }
+    setBusy(true);
+    try {
+      const updated = await influencersApi.updateMe({
+        workSamples: [...samples, form],
+      });
+      onUpdate(updated);
+      setSamples(updated.workSamples);
+      setForm({ title: "", url: "", description: "" });
+      toast.success("Work sample added");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeSample(index) {
+    try {
+      const updated = await influencersApi.updateMe({
+        workSamples: samples.filter((_, i) => i !== index),
+      });
+      setSamples(updated.workSamples);
+      toast.success("Work sample removed");
+    } catch (err) {
+      toast.error(err.message);
+    }
+  }
+
+  return (
+    <div className="surface-panel overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gold" style={{ background: "var(--gradient-ink)" }}>
+          <ImagePlus className="size-4" />
+        </span>
+        <h3 className="font-display text-lg font-bold">Work Samples</h3>
+      </div>
+      <div className="p-6 sm:p-8 space-y-4">
+        <div className="space-y-3">
+          <Field label="Title">
+            <Input
+              value={form.title}
+              onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+              placeholder="e.g. Product Review Video"
+            />
+          </Field>
+          <Field label="URL">
+            <Input
+              value={form.url}
+              onChange={(e) => setForm((p) => ({ ...p, url: e.target.value }))}
+              placeholder="https://…"
+            />
+          </Field>
+          <Field label="Description">
+            <Textarea
+              value={form.description}
+              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+              placeholder="Brief description"
+              rows={2}
+            />
+          </Field>
+          <div className="sm:pl-[180px]">
+            <Button variant="hero" onClick={addSample} disabled={busy} size="sm">
+              <Plus className="size-4" /> Add Sample
+            </Button>
+          </div>
+        </div>
+        {samples.length > 0 && (
+          <div className="pt-4 border-t border-border space-y-2">
+            {samples.map((s, i) => (
+              <div key={i} className="flex items-start justify-between rounded-lg border border-border p-3">
+                <div className="flex-1">
+                  <p className="font-medium text-sm">{s.title}</p>
+                  <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+                    View
+                  </a>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeSample(i)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InterestsSection({ profileData, onUpdate }) {
+  const [niches, setNiches] = useState((profileData?.niches || []).map((n) => n._id || n));
+  const [busy, setBusy] = useState(false);
+
+  async function handleSave() {
+    setBusy(true);
+    try {
+      const updated = await influencersApi.updateMe({ niches });
+      onUpdate(updated);
+      toast.success("Interests updated");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="surface-panel overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gold" style={{ background: "var(--gradient-ink)" }}>
+          <Tags className="size-4" />
+        </span>
+        <h3 className="font-display text-lg font-bold">Field of Interests</h3>
+      </div>
+      <div className="p-6 sm:p-8 space-y-4">
+        <Field label="Niches">
+          <NicheChips value={niches} onChange={setNiches} />
+        </Field>
+        <div className="sm:pl-[180px]">
+          <Button variant="hero" onClick={handleSave} disabled={busy}>
+            <Save className="size-4" />
+            {busy ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LanguagesSection({ profileData, onUpdate }) {
+  const [languages, setLanguages] = useState(profileData?.languages || []);
+  const [newLang, setNewLang] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function addLanguage() {
+    if (!newLang.trim()) return;
+    const updated = [...languages, newLang.trim()];
+    setLanguages(updated);
+    setNewLang("");
+    try {
+      const result = await influencersApi.updateMe({ languages: updated });
+      onUpdate(result);
+      toast.success("Language added");
+    } catch (err) {
+      toast.error(err.message);
+    }
+  }
+
+  async function removeLanguage(index) {
+    const updated = languages.filter((_, i) => i !== index);
+    setLanguages(updated);
+    try {
+      const result = await influencersApi.updateMe({ languages: updated });
+      onUpdate(result);
+      toast.success("Language removed");
+    } catch (err) {
+      toast.error(err.message);
+    }
+  }
+
+  return (
+    <div className="surface-panel overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gold" style={{ background: "var(--gradient-ink)" }}>
+          <Languages className="size-4" />
+        </span>
+        <h3 className="font-display text-lg font-bold">Content Languages</h3>
+      </div>
+      <div className="p-6 sm:p-8 space-y-4">
+        <div className="flex gap-2">
+          <Input
+            value={newLang}
+            onChange={(e) => setNewLang(e.target.value)}
+            placeholder="e.g. English, Tamil, Hindi"
+            onKeyDown={(e) => e.key === "Enter" && addLanguage()}
+          />
+          <Button variant="hero" size="sm" onClick={addLanguage}>
+            <Plus className="size-4" />
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {languages.map((lang, i) => (
+            <span key={i} className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium">
+              {lang}
+              <button
+                onClick={() => removeLanguage(i)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SocialAssetsSection() {
+  return (
+    <div className="surface-panel overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gold" style={{ background: "var(--gradient-ink)" }}>
+          <Share2 className="size-4" />
+        </span>
+        <h3 className="font-display text-lg font-bold">Social Media Assets</h3>
+      </div>
+      <div className="p-6 sm:p-8">
+        <ComingSoon label="Social Media Assets" />
+      </div>
+    </div>
+  );
+}
+
+function RatesSection({ profileData, onUpdate }) {
+  const [rates, setRates] = useState(profileData?.rates || []);
+  const [form, setForm] = useState({ activityType: "", priceUSD: "" });
+  const [busy, setBusy] = useState(false);
+
+  async function addRate() {
+    if (!form.activityType || !form.priceUSD) {
+      toast.error("Both fields required");
+      return;
+    }
+    setBusy(true);
+    try {
+      const updated = await influencersApi.updateMe({
+        rates: [...rates, { activityType: form.activityType, priceUSD: Number(form.priceUSD) }],
+      });
+      onUpdate(updated);
+      setRates(updated.rates);
+      setForm({ activityType: "", priceUSD: "" });
+      toast.success("Rate added");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="surface-panel overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gold" style={{ background: "var(--gradient-ink)" }}>
+          <IndianRupee className="size-4" />
+        </span>
+        <h3 className="font-display text-lg font-bold">My Rates</h3>
+      </div>
+      <div className="p-6 sm:p-8 space-y-4">
+        <div>
+          <p className="text-sm font-semibold mb-3">Add Rate</p>
+          <div className="space-y-3">
+            <Input
+              value={form.activityType}
+              onChange={(e) => setForm((p) => ({ ...p, activityType: e.target.value }))}
+              placeholder="Activity type (e.g. Instagram Story)"
+            />
+            <Input
+              type="number"
+              value={form.priceUSD}
+              onChange={(e) => setForm((p) => ({ ...p, priceUSD: e.target.value }))}
+              placeholder="Price in USD"
+            />
+            <Button variant="hero" onClick={addRate} disabled={busy} className="bg-green-500 hover:bg-green-600">
+              SAVE
+            </Button>
+          </div>
+        </div>
+        {rates.length > 0 && (
+          <div className="pt-4 border-t border-border">
+            <p className="text-sm font-semibold mb-2">Your Rates:</p>
+            <ul className="space-y-1 text-sm">
+              {rates.map((r, i) => (
+                <li key={i} className="flex justify-between">
+                  <span>{r.activityType}</span>
+                  <span className="font-medium">USD {r.priceUSD}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TermsSection({ profileData, onUpdate }) {
+  const [termsAccepted, setTermsAccepted] = useState(profileData?.termsAccepted || false);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSave() {
+    setBusy(true);
+    try {
+      const updated = await influencersApi.updateMe({ termsAccepted });
+      onUpdate(updated);
+      toast.success("Terms updated");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="surface-panel overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gold" style={{ background: "var(--gradient-ink)" }}>
+          <ScrollText className="size-4" />
+        </span>
+        <h3 className="font-display text-lg font-bold">My Terms</h3>
+      </div>
+      <div className="p-6 sm:p-8 space-y-4">
+        <Textarea
+          value="By accepting these terms, you agree to InfluGlue's creator terms and conditions..."
+          readOnly
+          rows={5}
+          className="bg-muted"
+        />
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={termsAccepted}
+            onChange={(e) => setTermsAccepted(e.target.checked)}
+            className="h-4 w-4 rounded accent-primary"
+          />
+          <span className="text-sm">I accept the terms and conditions</span>
+        </label>
+        <Button variant="hero" onClick={handleSave} disabled={busy}>
+          <Save className="size-4" />
+          {busy ? "Saving…" : "Save"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function PaymentDetailsSection({ profileData, onUpdate }) {
+  const [form, setForm] = useState(profileData?.paymentDetails || {});
+  const [busy, setBusy] = useState(false);
+
+  async function handleSave() {
+    setBusy(true);
+    try {
+      const updated = await influencersApi.updateMe({ paymentDetails: form });
+      onUpdate(updated);
+      toast.success("Payment details updated");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="surface-panel overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gold" style={{ background: "var(--gradient-ink)" }}>
+          <Wallet className="size-4" />
+        </span>
+        <h3 className="font-display text-lg font-bold">Payment Details</h3>
+      </div>
+      <div className="p-6 sm:p-8 space-y-4">
+        <Field label="Account Holder Name">
+          <Input
+            value={form.accountHolderName || ""}
+            onChange={(e) => setForm((p) => ({ ...p, accountHolderName: e.target.value }))}
+            placeholder="Full name"
+          />
+        </Field>
+        <Field label="Bank Name">
+          <Input
+            value={form.bankName || ""}
+            onChange={(e) => setForm((p) => ({ ...p, bankName: e.target.value }))}
+            placeholder="e.g. HDFC Bank"
+          />
+        </Field>
+        <Field label="Account Number">
+          <Input
+            value={form.accountNumber || ""}
+            onChange={(e) => setForm((p) => ({ ...p, accountNumber: e.target.value }))}
+            placeholder="Account number"
+          />
+        </Field>
+        <Field label="IFSC Code">
+          <Input
+            value={form.ifscCode || ""}
+            onChange={(e) => setForm((p) => ({ ...p, ifscCode: e.target.value }))}
+            placeholder="IFSC code"
+          />
+        </Field>
+        <Field label="UPI ID">
+          <Input
+            value={form.upiId || ""}
+            onChange={(e) => setForm((p) => ({ ...p, upiId: e.target.value }))}
+            placeholder="user@bank"
+          />
+        </Field>
+        <div className="sm:pl-[180px]">
+          <Button variant="hero" onClick={handleSave} disabled={busy}>
+            <Save className="size-4" />
+            {busy ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScoreSection({ profileData }) {
+  return (
+    <div className="surface-panel overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gold" style={{ background: "var(--gradient-ink)" }}>
+          <Gauge className="size-4" />
+        </span>
+        <h3 className="font-display text-lg font-bold">InfluBrand Score</h3>
+      </div>
+      <div className="p-6 sm:p-8">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-lg border border-border p-4">
+            <p className="text-sm text-muted-foreground">Your Score</p>
+            <p className="text-3xl font-bold text-primary mt-2">{profileData?.influBrandScore || 0}</p>
+          </div>
+          <div className="rounded-lg border border-border p-4">
+            <p className="text-sm text-muted-foreground">Account Balance</p>
+            <p className="text-3xl font-bold text-primary mt-2">${(profileData?.account_balance || 0).toFixed(2)}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteAccountSection({ user }) {
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function handleDelete() {
+    if (confirm !== "DELETE") {
+      toast.error("Type DELETE to confirm");
+      return;
+    }
+    setBusy(true);
+    try {
+      // await api call to delete account
+      toast.success("Account deleted");
+      // redirect to home
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="surface-panel overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-destructive" style={{ background: "rgba(239, 68, 68, 0.1)" }}>
+          <Trash2 className="size-4" />
+        </span>
+        <h3 className="font-display text-lg font-bold text-destructive">Delete Account</h3>
+      </div>
+      <div className="p-6 sm:p-8 space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Deleting your account is permanent and cannot be undone. All your data will be removed.
+        </p>
+        <div>
+          <Label className="text-sm mb-2 block">Type "DELETE" to confirm</Label>
+          <Input
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="Type DELETE"
+            className="font-mono"
+          />
+        </div>
+        <Button
+          variant="destructive"
+          onClick={handleDelete}
+          disabled={busy || confirm !== "DELETE"}
+        >
+          <Trash2 className="size-4" />
+          {busy ? "Deleting…" : "Delete Account"}
+        </Button>
       </div>
     </div>
   );
