@@ -182,7 +182,7 @@ export default function Dashboard() {
             Our team can build a curated creator list for your brief.
           </p>
           <Button variant="outline" className="mt-4" asChild>
-            <Link to="/contact">Contact us</Link>
+            <Link to="/dashboard/support">Contact us</Link>
           </Button>
         </div>
       </div>

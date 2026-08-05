@@ -38,6 +38,18 @@ function SiteLayout({ children }) {
   );
 }
 
+// Same as SiteLayout but without the footer — used for the brand's
+// influencer-browsing page reached from the dashboard navbar, which
+// already omits the marketing footer to keep focus on the results.
+function SiteLayoutNoFooter({ children }) {
+  return (
+    <>
+      <SiteHeader />
+      <PageTransition>{children}</PageTransition>
+    </>
+  );
+}
+
 function AnimatedRoutes() {
   const location = useLocation();
   return (
@@ -78,9 +90,9 @@ function AnimatedRoutes() {
           path="/influencers"
           element={
             <BrandOnlyRoute>
-              <SiteLayout>
+              <SiteLayoutNoFooter>
                 <Influencers />
-              </SiteLayout>
+              </SiteLayoutNoFooter>
             </BrandOnlyRoute>
           }
         />
