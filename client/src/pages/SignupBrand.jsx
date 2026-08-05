@@ -13,9 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StepProgress } from "@/components/site/StepProgress";
+import { LocationSelect } from "@/components/site/LocationSelect";
 import { auth } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
-import { CITIES, CATEGORIES } from "@/lib/catalog";
+import { useCatalog } from "@/hooks/useCatalog";
 
 const STEPS = ["Account", "Business"];
 
@@ -47,6 +48,7 @@ export default function SignupBrand() {
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
   const [logoPreview, setLogoPreview] = useState(null);
+  const { niches } = useCatalog();
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -54,8 +56,9 @@ export default function SignupBrand() {
     password: "",
     company_name: "",
     website: "",
-    industry: CATEGORIES[0],
-    city: CITIES[0],
+    nicheId: "",
+    state: "",
+    district: "",
   });
 
   function set(key, value) {
@@ -102,8 +105,10 @@ export default function SignupBrand() {
         companyName: form.company_name,
         phone: form.phone,
         website: form.website,
-        industry: form.industry,
-        city: form.city,
+        nicheId: form.nicheId,
+        state: form.state,
+        district: form.district,
+        city: form.district,
         logoUrl: logoPreview,
       });
       await refreshUser();
@@ -187,22 +192,22 @@ export default function SignupBrand() {
               <Field label="Website">
                 <Input value={form.website} onChange={(e) => set("website", e.target.value)} placeholder="https://" />
               </Field>
-              <Field label="Industry">
-                <Select value={form.industry} onValueChange={(v) => set("industry", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+              <Field label="Industry / niche">
+                <Select value={form.nicheId} onValueChange={(v) => set("nicheId", v)}>
+                  <SelectTrigger><SelectValue placeholder="Select industry" /></SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {niches.map((n) => (
+                      <SelectItem key={n._id || n.id} value={n._id || n.id}>{n.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="City">
-                <Select value={form.city} onValueChange={(v) => set("city", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
+              <LocationSelect
+                state={form.state}
+                district={form.district}
+                onStateChange={(v) => set("state", v)}
+                onDistrictChange={(v) => set("district", v)}
+              />
 
               <div className="flex gap-3 sm:col-span-2">
                 <Button type="button" variant="outline" size="lg" onClick={() => setStep(1)}>

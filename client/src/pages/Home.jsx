@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/accordion";
 import { InfluencerCard } from "@/components/site/InfluencerCard";
 import { influencers as influencersApi } from "@/lib/api";
-import { CATEGORIES, CITIES } from "@/lib/catalog";
+import { useCatalog } from "@/hooks/useCatalog";
+import { useStates } from "@/hooks/useDistricts";
 import { Reveal, RevealGroup, RevealItem } from "@/components/motion/Reveal";
 import { Parallax, FloatingBlob } from "@/components/motion/Parallax";
 import { AnimatedCounter } from "@/components/motion/AnimatedCounter";
@@ -141,6 +142,8 @@ function CtaCard({ image, alt, eyebrow, title, copy, to, cta }) {
 export default function Home() {
   const [influencers, setInfluencers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { niches } = useCatalog();
+  const { states } = useStates();
 
   useEffect(() => {
     influencersApi
@@ -374,38 +377,38 @@ export default function Home() {
         <Reveal className="surface-panel p-8" scale>
           <h2 className="font-display text-2xl font-bold">Business segments and categories</h2>
           <div className="mt-6 flex flex-wrap gap-2">
-            {CATEGORIES.map((cat, i) => (
+            {niches.map((n, i) => (
               <motion.div
-                key={cat}
+                key={n._id || n.id}
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.35, delay: i * 0.02 }}
               >
                 <Link
-                  to={`/influencers?category=${encodeURIComponent(cat)}`}
+                  to={`/influencers?niche=${encodeURIComponent(n._id || n.id)}`}
                   className="rounded-full border border-border bg-muted/30 px-4 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
                 >
-                  {cat}
+                  {n.name}
                 </Link>
               </motion.div>
             ))}
           </div>
-          <h3 className="mt-10 font-display text-xl font-semibold">Creators by city</h3>
+          <h3 className="mt-10 font-display text-xl font-semibold">Creators by state</h3>
           <div className="mt-4 flex flex-wrap gap-2">
-            {CITIES.map((city, i) => (
+            {states.map((s, i) => (
               <motion.div
-                key={city}
+                key={s.code}
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.35, delay: i * 0.02 }}
               >
                 <Link
-                  to={`/influencers?city=${encodeURIComponent(city)}`}
+                  to={`/influencers?state=${encodeURIComponent(s.code)}`}
                   className="rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
                 >
-                  {city}
+                  {s.name}
                 </Link>
               </motion.div>
             ))}

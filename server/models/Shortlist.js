@@ -5,7 +5,7 @@ const shortlistSchema = new mongoose.Schema(
     campaignId: { type: mongoose.Schema.Types.ObjectId, ref: "Campaign", default: null },
     brandId: { type: mongoose.Schema.Types.ObjectId, ref: "Brand", required: true },
     influencerId: { type: mongoose.Schema.Types.ObjectId, ref: "Influencer", required: true },
-    kind: { type: String, enum: ["shortlist", "offer"], default: "shortlist" },
+    kind: { type: String, enum: ["shortlist", "offer", "application"], default: "shortlist" },
     response: { type: String, enum: ["pending", "accepted", "declined"], default: "pending" },
     note: { type: String, default: null },
   },

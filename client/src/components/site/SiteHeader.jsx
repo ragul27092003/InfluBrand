@@ -5,12 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "./Logo";
 import { useAuth } from "@/lib/AuthContext";
 
-const NAV = [
-  { to: "/", label: "Home" },
-  { to: "/influencers", label: "Find Influencers" },
-  { to: "/for-brands", label: "For Brands" },
-  { to: "/contact", label: "Contact" },
-];
+const NAV = [];
 
 export function SiteHeader() {
   const { user, loading, logout } = useAuth();

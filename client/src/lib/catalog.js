@@ -1,47 +1,7 @@
-export const CATEGORIES = [
-  "Auto",
-  "Beauty",
-  "Books",
-  "Comedy",
-  "Education",
-  "Entertainment",
-  "Fashion",
-  "Fitness",
-  "Food",
-  "Gaming",
-  "Health",
-  "Home",
-  "Investment",
-  "Lifestyle",
-  "Parenting",
-  "Pet",
-  "Photography",
-  "Technology",
-  "Travel",
-];
-
-export const CITIES = [
-  "Ahmedabad",
-  "Bangalore",
-  "Bhopal",
-  "Chandigarh",
-  "Chennai",
-  "Coimbatore",
-  "Delhi",
-  "Hyderabad",
-  "Indore",
-  "Jaipur",
-  "Kochi",
-  "Kolkata",
-  "Lucknow",
-  "Mumbai",
-  "Nagpur",
-  "Pune",
-  "Surat",
-  "Visakhapatnam",
-];
-
-export const PLATFORMS = ["instagram", "youtube", "tiktok"];
+// Platforms, niches (categories) and locations used to be hardcoded here.
+// They now live in the database — see hooks/useCatalog.js (platforms +
+// niches) and hooks/useDistricts.js (states + districts, via
+// india-location-kit on the server) so they can grow without a code change.
 
 // The backend doesn't store a rating field yet, so derive a display-only
 // rating (3.5–5.0) from engagement rate — deterministic per influencer id.

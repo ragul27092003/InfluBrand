@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useNavigate, useLocation } from "react-router";
 import {
   Plus,
   LogOut,
@@ -7,38 +7,89 @@ import {
   X,
   Headphones,
   ChevronDown,
+  Mail,
+  Phone,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/site/Logo";
 import { useAuth } from "@/lib/AuthContext";
+import { brands, influencers } from "@/lib/api";
+
+const PURCHASE_LINKS = [
+  { to: "/dashboard/purchases/buy-connects", label: "Buy Connects" },
+  { to: "/dashboard/purchases/wallet", label: "Connect Wallet" },
+  { to: "/dashboard/purchases/connect-history", label: "Connect Purchase History" },
+  { to: "/dashboard/purchases/package-history", label: "Package Purchase History" },
+];
 
 const BRAND_NAV = [
   { to: "/dashboard", end: true, label: "Dashboard" },
-  { to: "/influencers", label: "Influencers", hasMenu: true },
+  { to: "/influencers", label: "Influencers" },
   { to: "/dashboard/campaigns", label: "My Campaigns" },
   { to: "/dashboard/profile", label: "My Profile" },
-  { to: "/dashboard/purchases", label: "My Purchase", hasMenu: true },
-  { to: "/dashboard/others", label: "Others", hasMenu: true },
+  { to: "/dashboard/purchases", label: "My Purchase" },
 ];
 
 const INFLUENCER_NAV = [
-  { to: "/dashboard/campaigns", label: "Campaigns", hasMenu: true },
+  { to: "/dashboard/campaigns", label: "Campaigns" },
   { to: "/dashboard/offers", label: "Direct Offers" },
   { to: "/dashboard/interests", label: "Profile Interests" },
   { to: "/dashboard/unlocks", label: "URL Unlocks" },
   { to: "/dashboard/profile", label: "My Profile" },
-  { to: "/dashboard/earnings", label: "My Earnings", hasMenu: true },
-  { to: "/dashboard/others", label: "Others", hasMenu: true },
+  { to: "/dashboard/earnings", label: "My Earnings" },
+  { to: "/dashboard/others", label: "Others" },
 ];
+
+const ADMIN_NAV = [{ to: "/dashboard/admin/catalog", end: true, label: "Manage Catalog" }];
 
 export function DashboardLayout() {
   const { user, accountType, loading, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [connectBalance, setConnectBalance] = useState(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [isVerified, setIsVerified] = useState(null);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    function onClickOutside(e) {
+      if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (accountType === "influencer") {
+      influencers
+        .me()
+        .then((i) => setIsVerified(i.is_verified))
+        .catch(() => setIsVerified(null));
+    }
+  }, [accountType]);
+
+  useEffect(() => {
+    if (accountType === "brand") {
+      brands
+        .me()
+        .then((b) => setConnectBalance(b.connectBalance))
+        .catch(() => setConnectBalance(null));
+    }
+  }, [accountType]);
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth", { replace: true });
   }, [user, loading, navigate]);
+
+  useEffect(() => {
+    // Admins have no brand/influencer dashboard content — send them
+    // straight to the page they actually need.
+    if (!loading && user && accountType === "admin" && window.location.pathname === "/dashboard") {
+      navigate("/dashboard/admin/catalog", { replace: true });
+    }
+  }, [user, accountType, loading, navigate]);
 
   if (loading) {
     return (
@@ -51,7 +102,8 @@ export function DashboardLayout() {
   if (!user) return null;
 
   const isBrand = accountType === "brand";
-  const navItems = isBrand ? BRAND_NAV : INFLUENCER_NAV;
+  const isAdmin = accountType === "admin";
+  const navItems = isBrand ? BRAND_NAV : isAdmin ? ADMIN_NAV : INFLUENCER_NAV;
   const displayName = user.fullName || user.email?.split("@")[0] || "there";
   const firstName = displayName.split(" ")[0];
 
@@ -60,8 +112,10 @@ export function DashboardLayout() {
     navigate("/");
   }
 
-  const stats = isBrand
-    ? [{ value: "02", label: "Connect balance" }]
+  const stats = isAdmin
+    ? []
+    : isBrand
+    ? [{ value: String(connectBalance ?? 0).padStart(2, "0"), label: "Connect balance" }]
     : [
         { value: "0.0", label: "InfluGlue score" },
         { value: "$0", label: "Account balance" },
@@ -70,27 +124,70 @@ export function DashboardLayout() {
   return (
     <div className="dash-light flex min-h-[calc(100vh-4rem)] flex-col bg-background text-foreground">
       {/* Identity row — clean, quiet, JPMorgan-style restraint */}
-      <div className="border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+      <div className="relative z-30 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <Logo />
           <div className="flex items-center gap-5">
-            <a
-              href="#"
+            <Link
+              to="/dashboard/support"
               className="hidden items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:flex"
             >
               <Headphones className="size-4" />
               Support
-            </a>
-            <button className="group flex items-center gap-2.5 rounded-full border border-transparent py-1 pr-1 pl-1.5 text-sm font-medium transition-colors hover:border-border">
-              <span
-                className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold"
-                style={{ background: "var(--gradient-ink)" }}
+            </Link>
+            <div ref={profileRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setProfileOpen((v) => !v)}
+                className="group flex items-center gap-2.5 rounded-full border border-transparent py-1 pr-1 pl-1.5 text-sm font-medium transition-colors hover:border-border"
               >
-                <span className="text-gold">{displayName.slice(0, 1).toUpperCase()}</span>
-              </span>
-              <span className="hidden sm:inline">{displayName}</span>
-              <ChevronDown className="size-3.5 text-muted-foreground transition-transform group-hover:translate-y-0.5" />
-            </button>
+                <span
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold"
+                  style={{ background: "var(--gradient-ink)" }}
+                >
+                  <span className="text-gold">{displayName.slice(0, 1).toUpperCase()}</span>
+                </span>
+                <span className="hidden sm:inline">{displayName}</span>
+                <ChevronDown
+                  className={`size-3.5 text-muted-foreground transition-transform ${profileOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              {profileOpen && (
+                <div className="absolute right-0 top-full z-20 mt-2 w-64 overflow-hidden rounded-lg border border-border bg-card shadow-[var(--shadow-card)]">
+                  {isVerified !== null && (
+                    <div className="flex items-center justify-between px-4 py-3 text-sm">
+                      <span className="text-muted-foreground">Current Status</span>
+                      <span
+                        className="rounded-full px-2.5 py-1 text-xs font-bold text-primary-foreground"
+                        style={{ background: "var(--gradient-mint)" }}
+                      >
+                        {isVerified ? "Approved" : "Under review"}
+                      </span>
+                    </div>
+                  )}
+                  <div className="divide-y divide-border/60 border-t border-border/60">
+                    {user.email && (
+                      <div className="flex items-center gap-2.5 px-4 py-3 text-sm">
+                        <Mail className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{user.email}</span>
+                      </div>
+                    )}
+                    {user.phone && (
+                      <div className="flex items-center gap-2.5 px-4 py-3 text-sm">
+                        <Phone className="size-4 shrink-0 text-muted-foreground" />
+                        <span>{user.phone}</span>
+                      </div>
+                    )}
+                    {user.city && (
+                      <div className="flex items-center gap-2.5 px-4 py-3 text-sm">
+                        <MapPin className="size-4 shrink-0 text-muted-foreground" />
+                        <span>{user.city}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               className="rounded-md border border-border p-1.5 lg:hidden"
               onClick={() => setMobileOpen((v) => !v)}
@@ -113,7 +210,7 @@ export function DashboardLayout() {
           <div>
             <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-white/45">
               <span className="h-px w-6" style={{ background: "var(--gradient-gold)" }} />
-              {isBrand ? "Brand account" : "Creator account"}
+              {isBrand ? "Brand account" : isAdmin ? "Admin account" : "Creator account"}
             </p>
             <h1 className="mt-2 font-display text-3xl font-bold text-white sm:text-4xl">
               Hi, {firstName}.
@@ -136,7 +233,7 @@ export function DashboardLayout() {
             ))}
             {isBrand && (
               <Button variant="hero" size="sm" asChild className="mb-1.5">
-                <Link to="/dashboard/campaigns">
+                <Link to="/dashboard/campaigns/new">
                   <Plus className="size-4" />
                   New campaign
                 </Link>
@@ -169,7 +266,6 @@ export function DashboardLayout() {
               }
             >
               {item.label}
-              {item.hasMenu && <ChevronDown className="size-3.5" />}
             </NavLink>
           ))}
           <button
@@ -181,6 +277,31 @@ export function DashboardLayout() {
           </button>
         </nav>
       </div>
+
+      {/* My Purchase sub-nav — plain in-flow pill row, only while inside that
+          section. No absolute positioning, so it can't get clipped by the
+          nav's overflow-x-auto scroll container. */}
+      {isBrand && location.pathname.startsWith("/dashboard/purchases") && (
+        <div className="border-b border-border bg-muted/30">
+          <nav className="mx-auto flex w-full max-w-7xl flex-wrap gap-1.5 px-4 py-2.5 sm:px-6">
+            {PURCHASE_LINKS.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={({ isActive }) =>
+                  `whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                    isActive
+                      ? "border-primary/30 bg-primary/10 text-primary"
+                      : "border-transparent text-muted-foreground hover:border-border hover:bg-card hover:text-foreground"
+                  }`
+                }
+              >
+                {link.label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
+      )}
 
       <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6">
         <Outlet />

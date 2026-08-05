@@ -83,7 +83,7 @@ export default function Dashboard() {
   function influencerDetail(item) {
     if (accountType === "brand") {
       const inf = item.influencerId;
-      return inf ? `${inf.city || ""} · ${inf.platform || ""}` : "";
+      return inf?.city || "";
     }
     const brand = item.brandId;
     return brand ? `${brand.city || ""}` : "";

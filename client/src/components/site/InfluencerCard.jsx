@@ -1,9 +1,15 @@
-import { BadgeCheck, Heart, Instagram, Send, Star, Youtube, Music2 } from "lucide-react";
+import { BadgeCheck, Heart, Instagram, Send, Star, Youtube, Music2, Facebook, Twitter, Linkedin, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCount, formatRupees, initials, derivedRating } from "@/lib/catalog";
 
-const PLATFORM_ICON = { youtube: Youtube, tiktok: Music2, instagram: Instagram };
-const PLATFORM_LABEL = { youtube: "YouTube", tiktok: "TikTok", instagram: "Instagram" };
+const PLATFORM_ICON = {
+  youtube: Youtube,
+  tiktok: Music2,
+  instagram: Instagram,
+  facebook: Facebook,
+  "x-twitter": Twitter,
+  linkedin: Linkedin,
+};
 
 function Stat({ label, value }) {
   return (
@@ -15,7 +21,8 @@ function Stat({ label, value }) {
 }
 
 export function InfluencerCard({ influencer, onShortlist, onOffer, actionLabel, busy }) {
-  const PlatformIcon = PLATFORM_ICON[influencer.platform] || Instagram;
+  const platform = influencer.platform; // populated Platform doc, or null
+  const PlatformIcon = PLATFORM_ICON[platform?.slug] || Globe;
   const rating = derivedRating(influencer);
 
   return (
@@ -38,7 +45,7 @@ export function InfluencerCard({ influencer, onShortlist, onOffer, actionLabel, 
         )}
         <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-xs text-white/80 backdrop-blur">
           <PlatformIcon className="size-3.5" />
-          {PLATFORM_LABEL[influencer.platform] || "Instagram"}
+          {platform?.name || "Instagram"}
         </span>
         <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-gold" style={{ background: "oklch(0.16 0.02 250 / 0.55)" }}>
           <Star className="size-3.5 fill-current" />
@@ -64,12 +71,12 @@ export function InfluencerCard({ influencer, onShortlist, onOffer, actionLabel, 
         </div>
 
         <div className="flex flex-wrap gap-1.5">
-          {influencer.categories.slice(0, 4).map((cat) => (
+          {(influencer.niches || []).slice(0, 4).map((n) => (
             <span
-              key={cat}
+              key={n._id || n}
               className="rounded-full border border-border bg-muted/40 px-2.5 py-0.5 text-[11px] text-muted-foreground"
             >
-              {cat}
+              {n.name || n}
             </span>
           ))}
         </div>

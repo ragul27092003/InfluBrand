@@ -1,21 +1,10 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Calendar, MapPin } from "lucide-react";
+import { Plus, X, ChevronDown, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { campaigns as campaignsApi } from "@/lib/api";
+import { campaigns as campaignsApi, shortlists as shortlistsApi, brands as brandsApi } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
-import { CATEGORIES, CITIES, PLATFORMS } from "@/lib/catalog";
 
 function EmptyRow({ colSpan, message }) {
   return (
@@ -27,28 +16,275 @@ function EmptyRow({ colSpan, message }) {
   );
 }
 
-export default function DashCampaigns() {
-  const { accountType } = useAuth();
+const statusColors = {
+  draft: "bg-muted text-muted-foreground",
+  pending: "bg-amber-500/15 text-amber-500",
+  active: "bg-primary/15 text-primary",
+  paused: "bg-yellow-500/15 text-yellow-400",
+  completed: "bg-green-500/15 text-green-400",
+};
+
+function Row({ label, children }) {
+  if (children === null || children === undefined || children === "") return null;
+  return (
+    <div className="grid grid-cols-3 gap-4 border-b border-border/50 py-2.5 text-sm last:border-0">
+      <span className="font-semibold text-muted-foreground">{label}</span>
+      <span className="col-span-2">{children}</span>
+    </div>
+  );
+}
+
+function DetailsModal({ campaign, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 py-10">
+      <div className="w-full max-w-2xl rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <h3 className="font-display text-lg font-bold">
+            Details of "{campaign.title} (ID: {campaign._id.slice(-6).toUpperCase()})"
+          </h3>
+          <button onClick={onClose} className="rounded-full bg-foreground p-1.5 text-background">
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="max-h-[70vh] overflow-y-auto px-6 py-4">
+          <Row label="Title">{campaign.title}</Row>
+          <Row label="Posted On">{campaign.createdAt && new Date(campaign.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</Row>
+          <Row label="Promotion Type">{campaign.promotionType}</Row>
+          <Row label="Brand Name">{campaign.brandName}</Row>
+          <Row label="Brand Overview">{campaign.brandOverview}</Row>
+          <Row label="Brand Website">
+            {campaign.brandWebsite && (
+              <a href={campaign.brandWebsite} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                {campaign.brandWebsite}
+              </a>
+            )}
+          </Row>
+          <Row label="Promotion Locations">{campaign.promotionCities?.join(", ")}</Row>
+          <Row label="Want to achieve">{campaign.goals?.join(", ")}</Row>
+          <Row label="How content should be made">{campaign.contentFormats?.join(", ")}</Row>
+          <Row label="No of Influencers Wanted">{campaign.influencerCount}</Row>
+          <Row label="Payment Budget">{campaign.payPerInfluencer}</Row>
+          <Row label="Expected Start">{campaign.expectedStart}</Row>
+          <Row label="Task Details">{campaign.taskDetails}</Row>
+          <Row label="Campaign Brief">
+            {campaign.briefFileUrl ? (
+              <a href={campaign.briefFileUrl} download={campaign.briefFileName || "campaign-brief"} className="text-primary hover:underline">
+                Download File
+              </a>
+            ) : (
+              campaign.briefFileName
+            )}
+          </Row>
+          <Row label="Instagram URL">
+            {campaign.instagramUrl && (
+              <a href={campaign.instagramUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">{campaign.instagramUrl}</a>
+            )}
+          </Row>
+          <Row label="YouTube URL">
+            {campaign.youtubeUrl && (
+              <a href={campaign.youtubeUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">{campaign.youtubeUrl}</a>
+            )}
+          </Row>
+          <Row label="Facebook URL">
+            {campaign.facebookUrl && (
+              <a href={campaign.facebookUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">{campaign.facebookUrl}</a>
+            )}
+          </Row>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ApplicantsModal({ campaign, onClose }) {
+  const [applicants, setApplicants] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    campaignsApi
+      .applicants(campaign._id)
+      .then(setApplicants)
+      .catch(() => setApplicants([]))
+      .finally(() => setLoading(false));
+  }, [campaign._id]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 py-10">
+      <div className="w-full max-w-3xl rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <h3 className="font-display text-lg font-bold">
+            Influencers Applied for "{campaign.title} (ID: {campaign._id.slice(-6).toUpperCase()})"
+          </h3>
+          <button onClick={onClose} className="rounded-full bg-foreground p-1.5 text-background">
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="overflow-x-auto px-6 py-4">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                <th className="px-3 py-2 text-left font-semibold text-muted-foreground">#</th>
+                <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Influencer Image</th>
+                <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Influencer Info</th>
+                <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Contact Details</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {loading ? (
+                <EmptyRow colSpan={4} message="Loading…" />
+              ) : applicants.length === 0 ? (
+                <EmptyRow colSpan={4} message="No Record(s)" />
+              ) : (
+                applicants.map((a, i) => (
+                  <tr key={a._id}>
+                    <td className="px-3 py-2">{i + 1}</td>
+                    <td className="px-3 py-2">
+                      {a.influencerId?.avatarUrl ? (
+                        <img src={a.influencerId.avatarUrl} alt="" className="size-10 rounded-full object-cover" />
+                      ) : (
+                        <span className="flex size-10 items-center justify-center rounded-full bg-muted text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">{a.influencerId?.name || "—"}</td>
+                    <td className="px-3 py-2">{a.influencerId?.email || a.influencerId?.phone || "—"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionMenu({ campaign, onView, onViewApplicants, onDelete }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative inline-block text-left">
+      <Button variant="soft" size="sm" onClick={() => setOpen((v) => !v)}>
+        Choose Action <ChevronDown className="size-3.5" />
+      </Button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-md border border-border bg-card shadow-lg">
+            <button
+              className="block w-full px-4 py-2 text-left text-sm hover:bg-muted"
+              onClick={() => { setOpen(false); onView(campaign); }}
+            >
+              View Details
+            </button>
+            <button
+              className="block w-full px-4 py-2 text-left text-sm hover:bg-muted"
+              onClick={() => { setOpen(false); onViewApplicants(campaign); }}
+            >
+              View Influencers
+            </button>
+            <button
+              className="block w-full px-4 py-2 text-left text-sm text-destructive hover:bg-muted"
+              onClick={() => { setOpen(false); onDelete(campaign._id); }}
+            >
+              Delete
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function InfluencerCampaignRow({ campaign, onApplied }) {
+  const [applying, setApplying] = useState(false);
+  const [applied, setApplied] = useState(false);
+
+  async function apply() {
+    setApplying(true);
+    try {
+      await shortlistsApi.create({ campaignId: campaign._id, kind: "application" });
+      setApplied(true);
+      onApplied?.();
+      toast.success("Application sent to the brand.");
+    } catch (err) {
+      toast.error(err.message || "Couldn't apply to this campaign.");
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  return (
+    <tr className="align-top transition-colors hover:bg-muted/20">
+      <td className="px-4 py-3">
+        <p className="font-medium">{campaign.title}</p>
+        <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+          <p>{campaign.brandId?.companyName}</p>
+          {campaign.promotionCities?.length > 0 && (
+            <p className="inline-flex items-center gap-1"><MapPin className="size-3" />{campaign.promotionCities.join(", ")}</p>
+          )}
+        </div>
+      </td>
+      <td className="px-4 py-3 text-xs">
+        <p>{campaign.payPerInfluencer || "—"}</p>
+        <p className="text-muted-foreground">{campaign.influencerCount ? `${campaign.influencerCount} creators` : ""}</p>
+      </td>
+      <td className="px-4 py-3 text-right">
+        <Button size="sm" variant={applied ? "soft" : "hero"} disabled={applying || applied} onClick={apply}>
+          {applied ? "Applied" : applying ? "Applying…" : "Apply"}
+        </Button>
+      </td>
+    </tr>
+  );
+}
+
+function InfluencerCampaignsView() {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({
-    title: "",
-    brief: "",
-    category: "",
-    city: "",
-    platform: "instagram",
-    budget: "",
-    status: "draft",
-  });
 
-  function resetForm() {
-    setForm({ title: "", brief: "", category: "", city: "", platform: "instagram", budget: "", status: "draft" });
-    setEditId(null);
-    setShowForm(false);
-  }
+  useEffect(() => {
+    campaignsApi
+      .browse()
+      .then(setCampaigns)
+      .catch(() => setCampaigns([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="surface-panel overflow-hidden">
+      <div className="border-b border-border px-6 py-4">
+        <h2 className="font-display text-lg font-bold">Open Campaigns</h2>
+        <p className="text-sm text-muted-foreground">Apply to campaigns brands are currently running.</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/30">
+              <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Campaign</th>
+              <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Pay</th>
+              <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/50">
+            {loading ? (
+              <EmptyRow colSpan={3} message="Loading campaigns…" />
+            ) : campaigns.length === 0 ? (
+              <EmptyRow colSpan={3} message="No open campaigns right now. Check back soon." />
+            ) : (
+              campaigns.map((c) => <InfluencerCampaignRow key={c._id} campaign={c} />)
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export default function DashCampaigns() {
+  const { accountType, user } = useAuth();
+  const [campaigns, setCampaigns] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [detailsCampaign, setDetailsCampaign] = useState(null);
+  const [applicantsCampaign, setApplicantsCampaign] = useState(null);
+  const [connectBalance, setConnectBalance] = useState(null);
 
   useEffect(() => {
     if (accountType !== "brand") {
@@ -60,50 +296,12 @@ export default function DashCampaigns() {
       .then(setCampaigns)
       .catch(() => setCampaigns([]))
       .finally(() => setLoading(false));
+
+    brandsApi
+      .me()
+      .then((b) => setConnectBalance(b?.connectBalance ?? 0))
+      .catch(() => setConnectBalance(null));
   }, [accountType]);
-
-  function startEdit(c) {
-    setForm({
-      title: c.title || "",
-      brief: c.brief || "",
-      category: c.category || "",
-      city: c.city || "",
-      platform: c.platform || "instagram",
-      budget: c.budget ?? "",
-      status: c.status || "draft",
-    });
-    setEditId(c._id);
-    setShowForm(true);
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!form.title.trim()) {
-      toast.error("Campaign title is required.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const payload = {
-        ...form,
-        budget: form.budget ? Number(form.budget) : null,
-      };
-      if (editId) {
-        const updated = await campaignsApi.update(editId, payload);
-        setCampaigns((prev) => prev.map((c) => (c._id === editId ? updated : c)));
-        toast.success("Campaign updated.");
-      } else {
-        const created = await campaignsApi.create(payload);
-        setCampaigns((prev) => [created, ...prev]);
-        toast.success("Campaign created!");
-      }
-      resetForm();
-    } catch (err) {
-      toast.error(err.message || "Something went wrong.");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function handleDelete(id) {
     if (!confirm("Delete this campaign? This cannot be undone.")) return;
@@ -117,171 +315,85 @@ export default function DashCampaigns() {
   }
 
   if (accountType !== "brand") {
-    return (
-      <div className="surface-panel p-12 text-center">
-        <p className="font-display text-lg">Campaigns are for brand accounts</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Switch to a brand account or <Link to="/influencers" className="text-primary hover:underline">browse the influencer directory</Link>.
-        </p>
-      </div>
-    );
+    return <InfluencerCampaignsView />;
   }
 
-  const statusColors = {
-    draft: "bg-muted text-muted-foreground",
-    active: "bg-primary/15 text-primary",
-    paused: "bg-yellow-500/15 text-yellow-400",
-    completed: "bg-green-500/15 text-green-400",
-  };
+  const firstName = (user?.fullName || user?.email?.split("@")[0] || "there").split(" ")[0];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="font-display text-2xl font-bold">My Campaigns</h2>
-        {!showForm && (
-          <Button variant="hero" size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm">
+            Hi <span className="font-semibold text-primary">{firstName}!</span>
+          </p>
+          {connectBalance !== null && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/60 px-3 py-1 text-xs font-semibold">
+              <span className="size-1.5 rounded-full bg-primary" />
+              Connect Balance: {connectBalance}
+            </span>
+          )}
+        </div>
+        <Button variant="hero" size="sm" asChild>
+          <Link to="/dashboard/campaigns/new">
             <Plus className="size-4" />
             Create new campaign
-          </Button>
-        )}
+          </Link>
+        </Button>
       </div>
 
-      {/* Create / Edit form */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="surface-panel space-y-4 p-6">
-          <h3 className="font-display text-lg font-semibold">
-            {editId ? "Edit campaign" : "New campaign"}
-          </h3>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Campaign title *</Label>
-              <Input
-                required
-                value={form.title}
-                onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-                placeholder="Summer collection launch"
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Brief</Label>
-              <Textarea
-                value={form.brief}
-                onChange={(e) => setForm((p) => ({ ...p, brief: e.target.value }))}
-                placeholder="Describe the campaign deliverables…"
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Select value={form.category} onValueChange={(v) => setForm((p) => ({ ...p, category: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>City</Label>
-              <Select value={form.city} onValueChange={(v) => setForm((p) => ({ ...p, city: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
-                <SelectContent>
-                  {CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Platform</Label>
-              <Select value={form.platform} onValueChange={(v) => setForm((p) => ({ ...p, platform: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PLATFORMS.map((p) => (
-                    <SelectItem key={p} value={p}>{p === "youtube" ? "YouTube" : "Instagram"}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Budget (₹)</Label>
-              <Input
-                type="number"
-                value={form.budget}
-                onChange={(e) => setForm((p) => ({ ...p, budget: e.target.value }))}
-                placeholder="50000"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={form.status} onValueChange={(v) => setForm((p) => ({ ...p, status: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="paused">Paused</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button variant="hero" type="submit" disabled={busy}>
-              {busy ? "Saving…" : editId ? "Update campaign" : "Create campaign"}
-            </Button>
-            <Button variant="outline" type="button" onClick={resetForm}>Cancel</Button>
-          </div>
-        </form>
-      )}
-
-      {/* Campaigns table */}
       <div className="surface-panel overflow-hidden">
+        <div className="border-b border-border px-6 py-4">
+          <h2 className="font-display text-lg font-bold">My Campaigns</h2>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">#</th>
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Campaign Info</th>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Platform</th>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Status</th>
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Brand Info</th>
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
               {loading ? (
-                <EmptyRow colSpan={5} message="Loading campaigns…" />
+                <EmptyRow colSpan={4} message="Loading campaigns…" />
               ) : campaigns.length === 0 ? (
-                <EmptyRow colSpan={5} message="No campaigns yet. Create your first campaign to get started." />
+                <EmptyRow colSpan={4} message="No campaigns yet. Create your first campaign to get started." />
               ) : (
                 campaigns.map((c, i) => (
-                  <tr key={c._id} className="transition-colors hover:bg-muted/20">
+                  <tr key={c._id} className="align-top transition-colors hover:bg-muted/20">
                     <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                     <td className="px-4 py-3">
                       <p className="font-medium">{c.title}</p>
-                      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        {c.category && <span>{c.category}</span>}
-                        {c.city && (
-                          <span className="inline-flex items-center gap-1">
-                            <MapPin className="size-3" />{c.city}
-                          </span>
-                        )}
-                        {c.budget && <span>₹{c.budget.toLocaleString("en-IN")}</span>}
+                      <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                        <p>ID: {c._id.slice(-6).toUpperCase()}</p>
+                        <p>Created On: {c.createdAt && new Date(c.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                        <p>
+                          Type: <span className="rounded-full bg-muted px-2 py-0.5 font-medium capitalize">{(c.type || "self_managed").replace("_", " ")}</span>
+                        </p>
+                        <p>
+                          Current Status: <span className={`rounded-full px-2 py-0.5 font-medium capitalize ${statusColors[c.status] || statusColors.pending}`}>{c.status}</span>
+                        </p>
                       </div>
                     </td>
-                    <td className="px-4 py-3 capitalize text-muted-foreground">
-                      {c.platform === "youtube" ? "YouTube" : "Instagram"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${statusColors[c.status] || statusColors.draft}`}>
-                        {c.status}
-                      </span>
+                    <td className="px-4 py-3 text-xs">
+                      <p><span className="font-semibold">Promotion Type:</span> <span className="capitalize">{c.promotionType || "—"}</span></p>
+                      <p><span className="font-semibold">Brand Name:</span> {c.brandName || "—"}</p>
+                      {c.promotionCities?.length > 0 && (
+                        <p className="mt-1 inline-flex items-center gap-1 text-muted-foreground">
+                          <MapPin className="size-3" />{c.promotionCities.slice(0, 2).join(", ")}{c.promotionCities.length > 2 ? "…" : ""}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="inline-flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => startEdit(c)} title="Edit">
-                          <Pencil className="size-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(c._id)} title="Delete">
-                          <Trash2 className="size-3.5 text-destructive" />
-                        </Button>
-                      </div>
+                      <ActionMenu
+                        campaign={c}
+                        onView={setDetailsCampaign}
+                        onViewApplicants={setApplicantsCampaign}
+                        onDelete={handleDelete}
+                      />
                     </td>
                   </tr>
                 ))
@@ -290,6 +402,9 @@ export default function DashCampaigns() {
           </table>
         </div>
       </div>
+
+      {detailsCampaign && <DetailsModal campaign={detailsCampaign} onClose={() => setDetailsCampaign(null)} />}
+      {applicantsCampaign && <ApplicantsModal campaign={applicantsCampaign} onClose={() => setApplicantsCampaign(null)} />}
     </div>
   );
 }

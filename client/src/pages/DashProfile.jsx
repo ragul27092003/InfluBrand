@@ -31,7 +31,10 @@ import {
 } from "@/components/ui/select";
 import { brands as brandsApi, influencers as influencersApi } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
-import { CATEGORIES, CITIES, PLATFORMS } from "@/lib/catalog";
+import { useCatalog } from "@/hooks/useCatalog";
+import { LocationSelect } from "@/components/site/LocationSelect";
+import { PlatformSelect } from "@/components/site/PlatformSelect";
+import { NicheChips } from "@/components/site/NicheChips";
 
 function readAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -95,6 +98,7 @@ function BrandProfile({ user }) {
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const { niches } = useCatalog();
 
   useEffect(() => {
     brandsApi
@@ -104,8 +108,9 @@ function BrandProfile({ user }) {
           companyName: data.companyName || "",
           contactName: data.contactName || "",
           website: data.website || "",
-          industry: data.industry || "",
-          city: data.city || "",
+          nicheId: data.nicheId?._id || data.nicheId || "",
+          state: data.state || "",
+          district: data.district || "",
           about: data.about || "",
           logoUrl: data.logoUrl || null,
         });
@@ -115,8 +120,9 @@ function BrandProfile({ user }) {
           companyName: "",
           contactName: user.fullName || "",
           website: "",
-          industry: "",
-          city: user.city || "",
+          nicheId: "",
+          state: "",
+          district: "",
           about: "",
           logoUrl: null,
         });
@@ -128,7 +134,7 @@ function BrandProfile({ user }) {
     e.preventDefault();
     setBusy(true);
     try {
-      await brandsApi.updateMe(form);
+      await brandsApi.updateMe({ ...form, city: form.district });
       toast.success("Profile updated.");
     } catch (err) {
       toast.error(err.message || "Failed to update profile.");
@@ -165,21 +171,21 @@ function BrandProfile({ user }) {
           <Input value={form.website} onChange={(e) => setForm((p) => ({ ...p, website: e.target.value }))} placeholder="https://example.com" />
         </Field>
         <Field label="Industry">
-          <Select value={form.industry} onValueChange={(v) => setForm((p) => ({ ...p, industry: v }))}>
+          <Select value={form.nicheId} onValueChange={(v) => setForm((p) => ({ ...p, nicheId: v }))}>
             <SelectTrigger><SelectValue placeholder="Select industry" /></SelectTrigger>
             <SelectContent>
-              {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {niches.map((n) => (
+                <SelectItem key={n._id || n.id} value={n._id || n.id}>{n.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </Field>
-        <Field label="City">
-          <Select value={form.city} onValueChange={(v) => setForm((p) => ({ ...p, city: v }))}>
-            <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
-            <SelectContent>
-              {CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </Field>
+        <LocationSelect
+          state={form.state}
+          district={form.district}
+          onStateChange={(v) => setForm((p) => ({ ...p, state: v }))}
+          onDistrictChange={(v) => setForm((p) => ({ ...p, district: v }))}
+        />
         <Field label="About">
           <Textarea value={form.about} onChange={(e) => setForm((p) => ({ ...p, about: e.target.value }))} placeholder="Tell creators about your brand…" rows={3} />
         </Field>
@@ -236,7 +242,7 @@ function BasicProfileForm({ user }) {
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [cats, setCats] = useState([]);
+  const [niches, setNiches] = useState([]);
 
   useEffect(() => {
     influencersApi
@@ -245,24 +251,26 @@ function BasicProfileForm({ user }) {
         setForm({
           name: data.name || "",
           handle: data.handle || "",
-          platform: data.platform || "instagram",
+          platformId: data.platformId?._id || data.platformId || "",
           bio: data.bio || "",
-          city: data.city || "",
+          state: data.state || "",
+          district: data.district || "",
           gender: data.gender || "",
           followers: data.followers ?? "",
           startingPrice: data.startingPrice ?? "",
           isPublished: data.isPublished ?? false,
           avatarUrl: data.avatarUrl || null,
         });
-        setCats(data.categories || []);
+        setNiches((data.niches || []).map((n) => n._id || n));
       })
       .catch(() => {
         setForm({
           name: user.fullName || "",
           handle: "",
-          platform: "instagram",
+          platformId: "",
           bio: "",
-          city: user.city || "",
+          state: "",
+          district: "",
           gender: "",
           followers: "",
           startingPrice: "",
@@ -273,21 +281,16 @@ function BasicProfileForm({ user }) {
       .finally(() => setLoading(false));
   }, [user]);
 
-  function toggleCat(cat) {
-    setCats((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat].slice(0, 5)
-    );
-  }
-
   async function handleSave(e) {
     e.preventDefault();
     setBusy(true);
     try {
       await influencersApi.updateMe({
         ...form,
+        city: form.district,
         followers: form.followers ? Number(form.followers) : 0,
         startingPrice: form.startingPrice ? Number(form.startingPrice) : null,
-        categories: cats,
+        niches,
       });
       toast.success("Profile updated.");
     } catch (err) {
@@ -315,26 +318,17 @@ function BasicProfileForm({ user }) {
         <Input value={form.handle} onChange={(e) => setForm((p) => ({ ...p, handle: e.target.value }))} placeholder="@yourhandle" />
       </Field>
       <Field label="Platform">
-        <Select value={form.platform} onValueChange={(v) => setForm((p) => ({ ...p, platform: v }))}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {PLATFORMS.map((p) => (
-              <SelectItem key={p} value={p}>{p === "youtube" ? "YouTube" : p === "tiktok" ? "TikTok" : "Instagram"}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <PlatformSelect value={form.platformId} onChange={(v) => setForm((p) => ({ ...p, platformId: v }))} />
       </Field>
       <Field label="Bio">
         <Textarea value={form.bio} onChange={(e) => setForm((p) => ({ ...p, bio: e.target.value }))} placeholder="Describe yourself…" rows={3} />
       </Field>
-      <Field label="City">
-        <Select value={form.city} onValueChange={(v) => setForm((p) => ({ ...p, city: v }))}>
-          <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
-          <SelectContent>
-            {CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </Field>
+      <LocationSelect
+        state={form.state}
+        district={form.district}
+        onStateChange={(v) => setForm((p) => ({ ...p, state: v }))}
+        onDistrictChange={(v) => setForm((p) => ({ ...p, district: v }))}
+      />
       <Field label="Gender">
         <div className="flex items-center gap-5">
           {["female", "male", "other"].map((g) => (
@@ -357,26 +351,8 @@ function BasicProfileForm({ user }) {
       <Field label="Starting Price (₹)">
         <Input type="number" value={form.startingPrice} onChange={(e) => setForm((p) => ({ ...p, startingPrice: e.target.value }))} placeholder="25000" />
       </Field>
-      <Field label="Categories">
-        <div className="flex flex-wrap gap-2">
-          {CATEGORIES.map((cat) => {
-            const active = cats.includes(cat);
-            return (
-              <button
-                type="button"
-                key={cat}
-                onClick={() => toggleCat(cat)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                  active
-                    ? "border-transparent bg-foreground text-background"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {cat}
-              </button>
-            );
-          })}
-        </div>
+      <Field label="Niches">
+        <NicheChips value={niches} onChange={setNiches} />
       </Field>
       <Field label="Published">
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm">

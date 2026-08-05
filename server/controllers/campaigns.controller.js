@@ -1,18 +1,99 @@
 import { Brand } from "../models/Brand.js";
 import { Campaign } from "../models/Campaign.js";
+import { Niche } from "../models/Niche.js";
+import { Platform } from "../models/Platform.js";
+import { Shortlist } from "../models/Shortlist.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { assertIdsExist } from "../utils/validateRefs.js";
 
 async function myBrandId(userId) {
   const brand = await Brand.findOne({ userId }).select("_id");
   return brand?._id ?? null;
 }
 
+const POPULATE = [
+  { path: "nicheId", select: "name slug" },
+  { path: "platformId", select: "name slug icon" },
+];
+
+function toClientShape(doc) {
+  return {
+    id: doc._id.toString(),
+    _id: doc._id.toString(),
+    title: doc.title,
+    brief: doc.brief,
+    nicheId: doc.nicheId,
+    state: doc.state,
+    district: doc.district,
+    city: doc.city,
+    platformId: doc.platformId,
+    budget: doc.budget,
+    startsOn: doc.startsOn,
+    endsOn: doc.endsOn,
+    status: doc.status,
+    createdAt: doc.createdAt,
+    promotionType: doc.promotionType,
+    promotionCities: doc.promotionCities,
+    brandName: doc.brandName,
+    brandOverview: doc.brandOverview,
+    brandWebsite: doc.brandWebsite,
+    goals: doc.goals,
+    contentFormats: doc.contentFormats,
+    taskDetails: doc.taskDetails,
+    briefFileName: doc.briefFileName,
+    briefFileUrl: doc.briefFileUrl,
+    influencerCount: doc.influencerCount,
+    payPerInfluencer: doc.payPerInfluencer,
+    expectedStart: doc.expectedStart,
+    instagramUrl: doc.instagramUrl,
+    youtubeUrl: doc.youtubeUrl,
+    facebookUrl: doc.facebookUrl,
+    packageSelected: doc.packageSelected,
+    type: doc.type,
+  };
+}
+
+const WIZARD_FIELDS = [
+  "promotionType",
+  "promotionCities",
+  "brandName",
+  "brandOverview",
+  "brandWebsite",
+  "goals",
+  "contentFormats",
+  "taskDetails",
+  "briefFileName",
+  "briefFileUrl",
+  "influencerCount",
+  "payPerInfluencer",
+  "expectedStart",
+  "instagramUrl",
+  "youtubeUrl",
+  "facebookUrl",
+  "packageSelected",
+  "type",
+];
+
+// GET /api/campaigns/browse — public feed of open campaigns for influencers to apply to
+export const browseCampaigns = asyncHandler(async (req, res) => {
+  const campaigns = await Campaign.find({ status: { $in: ["active", "pending"] } })
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .populate([...POPULATE, { path: "brandId", select: "companyName city logoUrl" }]);
+  res.json(
+    campaigns.map((c) => ({
+      ...toClientShape(c),
+      brandId: c.brandId,
+    }))
+  );
+});
+
 // GET /api/campaigns — campaigns owned by the signed-in brand
 export const listMyCampaigns = asyncHandler(async (req, res) => {
   const brandId = await myBrandId(req.user._id);
   if (!brandId) return res.json([]);
-  const campaigns = await Campaign.find({ brandId }).sort({ createdAt: -1 });
-  res.json(campaigns);
+  const campaigns = await Campaign.find({ brandId }).sort({ createdAt: -1 }).populate(POPULATE);
+  res.json(campaigns.map(toClientShape));
 });
 
 // POST /api/campaigns
@@ -20,22 +101,35 @@ export const createCampaign = asyncHandler(async (req, res) => {
   const brandId = await myBrandId(req.user._id);
   if (!brandId) return res.status(404).json({ error: "No brand profile for this account" });
 
-  const { title, brief, category, city, platform, budget, startsOn, endsOn, status } = req.body;
+  const { title, brief, nicheId, state, district, city, platformId, budget, startsOn, endsOn, status } =
+    req.body;
   if (!title) return res.status(400).json({ error: "title is required" });
+
+  await assertIdsExist(Niche, nicheId, "niche");
+  await assertIdsExist(Platform, platformId, "platform");
+
+  const wizardData = {};
+  for (const key of WIZARD_FIELDS) {
+    if (key in req.body) wizardData[key] = req.body[key];
+  }
 
   const campaign = await Campaign.create({
     brandId,
     title,
     brief,
-    category,
+    nicheId: nicheId || null,
+    state: state || null,
+    district: district || null,
     city,
-    platform,
+    platformId: platformId || null,
     budget,
     startsOn,
     endsOn,
-    status,
+    status: status || "pending",
+    ...wizardData,
   });
-  res.status(201).json(campaign);
+  await campaign.populate(POPULATE);
+  res.status(201).json(toClientShape(campaign));
 });
 
 // PATCH /api/campaigns/:id
@@ -43,18 +137,49 @@ export const updateCampaign = asyncHandler(async (req, res) => {
   const brandId = await myBrandId(req.user._id);
   if (!brandId) return res.status(404).json({ error: "No brand profile for this account" });
 
-  const allowed = ["title", "brief", "category", "city", "platform", "budget", "startsOn", "endsOn", "status"];
+  const allowed = [
+    "title",
+    "brief",
+    "nicheId",
+    "state",
+    "district",
+    "city",
+    "platformId",
+    "budget",
+    "startsOn",
+    "endsOn",
+    "status",
+    ...WIZARD_FIELDS,
+  ];
   const updates = {};
   for (const key of allowed) {
     if (key in req.body) updates[key] = req.body[key];
   }
 
+  await assertIdsExist(Niche, updates.nicheId, "niche");
+  await assertIdsExist(Platform, updates.platformId, "platform");
+
   const campaign = await Campaign.findOneAndUpdate({ _id: req.params.id, brandId }, updates, {
     new: true,
     runValidators: true,
-  });
+  }).populate(POPULATE);
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
-  res.json(campaign);
+  res.json(toClientShape(campaign));
+});
+
+// GET /api/campaigns/:id/applicants — influencers who applied/were matched to this campaign
+export const listCampaignApplicants = asyncHandler(async (req, res) => {
+  const brandId = await myBrandId(req.user._id);
+  if (!brandId) return res.status(404).json({ error: "No brand profile for this account" });
+
+  const campaign = await Campaign.findOne({ _id: req.params.id, brandId }).select("_id");
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+
+  const applicants = await Shortlist.find({ campaignId: campaign._id, brandId })
+    .populate("influencerId", "name city platformId handle avatarUrl phone email")
+    .sort({ createdAt: -1 });
+
+  res.json(applicants);
 });
 
 // DELETE /api/campaigns/:id

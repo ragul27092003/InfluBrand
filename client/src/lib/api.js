@@ -72,8 +72,13 @@ export const auth = {
 };
 
 export const influencers = {
-  list() {
-    return apiFetch("/api/influencers", { auth: false });
+  list(filters = {}) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value) params.set(key, value);
+    }
+    const qs = params.toString();
+    return apiFetch(`/api/influencers${qs ? `?${qs}` : ""}`, { auth: false });
   },
   get(id) {
     return apiFetch(`/api/influencers/${id}`, { auth: false });
@@ -86,6 +91,55 @@ export const influencers = {
   },
 };
 
+// Platforms & niches are DB-backed (see server/models) so new ones can be
+// added later without a code change — this just reads whatever exists.
+export const catalog = {
+  listPlatforms() {
+    return apiFetch("/api/platforms", { auth: false });
+  },
+  listAllPlatforms() {
+    return apiFetch("/api/platforms?all=true", { auth: false });
+  },
+  listNiches() {
+    return apiFetch("/api/niches", { auth: false });
+  },
+  listAllNiches() {
+    return apiFetch("/api/niches?all=true", { auth: false });
+  },
+  // Admin-only — used by the AdminCatalog page.
+  createPlatform(patch) {
+    return apiFetch("/api/platforms", { method: "POST", body: patch });
+  },
+  updatePlatform(id, patch) {
+    return apiFetch(`/api/platforms/${id}`, { method: "PATCH", body: patch });
+  },
+  deactivatePlatform(id) {
+    return apiFetch(`/api/platforms/${id}`, { method: "DELETE" });
+  },
+  createNiche(patch) {
+    return apiFetch("/api/niches", { method: "POST", body: patch });
+  },
+  updateNiche(id, patch) {
+    return apiFetch(`/api/niches/${id}`, { method: "PATCH", body: patch });
+  },
+  deactivateNiche(id) {
+    return apiFetch(`/api/niches/${id}`, { method: "DELETE" });
+  },
+};
+
+// States & districts come from the india-location-kit package on the server
+// (plus any admin-added custom districts) — never hardcoded on the client.
+export const locations = {
+  listStates() {
+    return apiFetch("/api/locations/states", { auth: false });
+  },
+  listDistricts(stateCode) {
+    return apiFetch(`/api/locations/districts?state=${encodeURIComponent(stateCode)}`, {
+      auth: false,
+    });
+  },
+};
+
 export const brands = {
   me() {
     return apiFetch("/api/brands/me");
@@ -95,9 +149,27 @@ export const brands = {
   },
 };
 
+export const connects = {
+  packages() {
+    return apiFetch("/api/connects/packages");
+  },
+  purchase(packageKey) {
+    return apiFetch("/api/connects/purchase", { method: "POST", body: { packageKey } });
+  },
+  purchaseHistory() {
+    return apiFetch("/api/connects/purchases");
+  },
+  wallet() {
+    return apiFetch("/api/connects/wallet");
+  },
+};
+
 export const campaigns = {
   list() {
     return apiFetch("/api/campaigns");
+  },
+  browse() {
+    return apiFetch("/api/campaigns/browse");
   },
   create(payload) {
     return apiFetch("/api/campaigns", { method: "POST", body: payload });
@@ -107,6 +179,9 @@ export const campaigns = {
   },
   remove(id) {
     return apiFetch(`/api/campaigns/${id}`, { method: "DELETE" });
+  },
+  applicants(id) {
+    return apiFetch(`/api/campaigns/${id}/applicants`);
   },
 };
 

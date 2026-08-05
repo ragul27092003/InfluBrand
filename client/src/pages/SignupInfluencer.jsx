@@ -13,12 +13,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StepProgress } from "@/components/site/StepProgress";
+import { LocationSelect } from "@/components/site/LocationSelect";
+import { PlatformChips } from "@/components/site/PlatformChips";
+import { NicheChips } from "@/components/site/NicheChips";
 import { auth } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
-import { CATEGORIES, CITIES, PLATFORMS } from "@/lib/catalog";
 
 const STEPS = ["Basic info", "Socials", "Niche & pricing", "Verify"];
-const PLATFORM_LABELS = { instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok" };
 
 function Field({ label, required, children }) {
   return (
@@ -47,7 +48,8 @@ export default function SignupInfluencer() {
   const fileRef = useRef(null);
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
-  const [categories, setCategories] = useState([]);
+  const [niches, setNiches] = useState([]);
+  const [platforms, setPlatforms] = useState([]);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -57,22 +59,16 @@ export default function SignupInfluencer() {
     email: "",
     phone: "",
     password: "",
-    city: CITIES[0],
+    state: "",
+    district: "",
     gender: "female",
     handle: "",
-    platform: PLATFORMS[0],
     followers: "",
     startingPrice: "",
   });
 
   function set(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function toggleCategory(cat) {
-    setCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat].slice(0, 5)
-    );
   }
 
   async function handleAvatarChange(e) {
@@ -93,13 +89,21 @@ export default function SignupInfluencer() {
         toast.error("Password must be at least 6 characters.");
         return;
       }
+      if (!form.state || !form.district) {
+        toast.error("Please select your state and district.");
+        return;
+      }
+    }
+    if (step === 2 && platforms.length === 0) {
+      toast.error("Pick at least one platform.");
+      return;
     }
     if (step === 2 && !form.handle) {
       toast.error("Please add your handle for the selected platform.");
       return;
     }
-    if (step === 3 && categories.length === 0) {
-      toast.error("Pick at least one content category.");
+    if (step === 3 && niches.length === 0) {
+      toast.error("Pick at least one content niche.");
       return;
     }
     setStep((s) => s + 1);
@@ -133,10 +137,12 @@ export default function SignupInfluencer() {
         fullName: form.full_name,
         phone: form.phone,
         handle: form.handle,
-        platform: form.platform,
+        platforms,
         gender: form.gender,
-        city: form.city,
-        categories,
+        state: form.state,
+        district: form.district,
+        city: form.district,
+        niches,
         avatarUrl: avatarPreview,
         followers: form.followers,
         startingPrice: form.startingPrice,
@@ -194,14 +200,6 @@ export default function SignupInfluencer() {
               <Field label="Phone">
                 <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+91 98765 43210" />
               </Field>
-              <Field label="City">
-                <Select value={form.city} onValueChange={(v) => set("city", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
               <Field label="Gender">
                 <Select value={form.gender} onValueChange={(v) => set("gender", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -212,6 +210,12 @@ export default function SignupInfluencer() {
                   </SelectContent>
                 </Select>
               </Field>
+              <LocationSelect
+                state={form.state}
+                district={form.district}
+                onStateChange={(v) => set("state", v)}
+                onDistrictChange={(v) => set("district", v)}
+              />
               <Field label="Password" required>
                 <Input required type="password" minLength={6} value={form.password} onChange={(e) => set("password", e.target.value)} placeholder="At least 6 characters" />
               </Field>
@@ -229,15 +233,8 @@ export default function SignupInfluencer() {
 
           {step === 2 && (
             <form className="mt-8 grid gap-4 sm:grid-cols-2" onSubmit={goNext}>
-              <Field label="Primary platform">
-                <Select value={form.platform} onValueChange={(v) => set("platform", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PLATFORMS.map((p) => (
-                      <SelectItem key={p} value={p}>{PLATFORM_LABELS[p]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <Field label="Platforms">
+                <PlatformChips value={platforms} onChange={setPlatforms} />
               </Field>
               <Field label="Handle" required>
                 <Input required value={form.handle} onChange={(e) => set("handle", e.target.value)} placeholder="@yourhandle" />
@@ -259,25 +256,9 @@ export default function SignupInfluencer() {
           {step === 3 && (
             <form className="mt-8 space-y-5" onSubmit={goNext}>
               <div>
-                <Label>Content categories (up to 5)</Label>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {CATEGORIES.map((cat) => {
-                    const active = categories.includes(cat);
-                    return (
-                      <button
-                        type="button"
-                        key={cat}
-                        onClick={() => toggleCategory(cat)}
-                        className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                          active
-                            ? "border-transparent bg-[image:var(--gradient-mint)] text-primary-foreground"
-                            : "border-border text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    );
-                  })}
+                <Label>Content niches (up to 5)</Label>
+                <div className="mt-3">
+                  <NicheChips value={niches} onChange={setNiches} />
                 </div>
               </div>
               <Field label="Starting price (₹)">

@@ -11,6 +11,10 @@ import campaignsRoutes from "./routes/campaigns.routes.js";
 import shortlistsRoutes from "./routes/shortlists.routes.js";
 import messagesRoutes from "./routes/messages.routes.js";
 import contactRoutes from "./routes/contact.routes.js";
+import platformsRoutes from "./routes/platforms.routes.js";
+import nichesRoutes from "./routes/niches.routes.js";
+import locationsRoutes from "./routes/locations.routes.js";
+import connectsRoutes from "./routes/connects.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/errorHandler.js";
 
 const PORT = process.env.PORT || 4000;
@@ -30,7 +34,7 @@ const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
   .map((o) => o.trim());
 
 app.use(cors({ origin: allowedOrigins, credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 app.use(morgan("dev"));
 
 // ── Routes ──────────────────────────────────────────────────────
@@ -43,6 +47,10 @@ app.use("/api/campaigns", campaignsRoutes);
 app.use("/api/shortlists", shortlistsRoutes);
 app.use("/api/messages", messagesRoutes);
 app.use("/api/contact", contactRoutes);
+app.use("/api/platforms", platformsRoutes);
+app.use("/api/niches", nichesRoutes);
+app.use("/api/locations", locationsRoutes);
+app.use("/api/connects", connectsRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

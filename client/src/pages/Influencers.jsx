@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InfluencerCard } from "@/components/site/InfluencerCard";
 import { influencers as influencersApi, shortlists } from "@/lib/api";
-import { CATEGORIES, CITIES, PLATFORMS, formatCount, formatRupees, derivedRating } from "@/lib/catalog";
+import { formatCount, formatRupees, derivedRating } from "@/lib/catalog";
+import { useCatalog } from "@/hooks/useCatalog";
+import { useStates } from "@/hooks/useDistricts";
 import { useAuth } from "@/lib/AuthContext";
 import { Reveal, RevealGroup, RevealItem } from "@/components/motion/Reveal";
 
-const PLATFORM_LABEL = { instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok" };
 const MAX_FOLLOWERS = 1000000;
 const MAX_PRICE = 100000;
 
@@ -23,16 +24,16 @@ function FilterGroup({ title, options, active, onSelect }) {
       </h3>
       <ul className="max-h-72 space-y-1 overflow-y-auto pr-1">
         {options.map((option) => (
-          <li key={option}>
+          <li key={option.value}>
             <button
-              onClick={() => onSelect(option)}
+              onClick={() => onSelect(option.value)}
               className={`w-full rounded-lg px-3 py-1.5 text-left text-sm transition-colors ${
-                active === option
+                active === option.value
                   ? "bg-foreground text-background"
                   : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
               }`}
             >
-              {option}
+              {option.label}
             </button>
           </li>
         ))}
@@ -63,24 +64,27 @@ function RangeSlider({ title, value, max, onChange, format }) {
   );
 }
 
-function PlatformFilter({ selected, onToggle }) {
+function PlatformFilter({ platforms, selected, onToggle }) {
   return (
     <div className="surface-panel surface-panel-hover p-5">
       <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         Platform
       </h3>
       <div className="space-y-2">
-        {PLATFORMS.map((p) => (
-          <label key={p} className="flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={selected.includes(p)}
-              onChange={() => onToggle(p)}
-              className="h-4 w-4 rounded border-border accent-primary"
-            />
-            {PLATFORM_LABEL[p]}
-          </label>
-        ))}
+        {platforms.map((p) => {
+          const id = p._id || p.id;
+          return (
+            <label key={id} className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={selected.includes(id)}
+                onChange={() => onToggle(id)}
+                className="h-4 w-4 rounded border-border accent-primary"
+              />
+              {p.name}
+            </label>
+          );
+        })}
       </div>
     </div>
   );
@@ -89,16 +93,19 @@ function PlatformFilter({ selected, onToggle }) {
 export default function Influencers() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, accountType } = useAuth();
+  const { platforms, niches } = useCatalog();
+  const { states } = useStates();
   const [influencers, setInfluencers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState("popular");
   const [busyId, setBusyId] = useState(null);
-  const [platforms, setPlatforms] = useState([]);
+  const [platformIds, setPlatformIds] = useState([]);
   const [maxFollowers, setMaxFollowers] = useState(MAX_FOLLOWERS);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
 
-  const category = searchParams.get("category") || "All";
-  const city = searchParams.get("city") || "All";
+  // "niche" and "state" hold ids/codes in the URL; "All" means no filter.
+  const nicheFilter = searchParams.get("niche") || "All";
+  const stateFilter = searchParams.get("state") || "All";
   const query = searchParams.get("q") || "";
 
   useEffect(() => {
@@ -109,22 +116,24 @@ export default function Influencers() {
       .finally(() => setLoading(false));
   }, []);
 
-  function togglePlatform(p) {
-    setPlatforms((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  function togglePlatform(id) {
+    setPlatformIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
   const results = useMemo(() => {
     const filtered = influencers.filter((inf) => {
-      const matchCategory = category === "All" || inf.categories.includes(category);
-      const matchCity = city === "All" || inf.city === city;
+      const infNicheIds = (inf.niches || []).map((n) => n._id || n);
+      const matchNiche = nicheFilter === "All" || infNicheIds.includes(nicheFilter);
+      const matchState = stateFilter === "All" || inf.state === stateFilter;
       const matchQuery =
         !query ||
         inf.name.toLowerCase().includes(query.toLowerCase()) ||
         (inf.handle ?? "").toLowerCase().includes(query.toLowerCase());
-      const matchPlatform = platforms.length === 0 || platforms.includes(inf.platform);
+      const infPlatformId = inf.platform?._id || inf.platform;
+      const matchPlatform = platformIds.length === 0 || platformIds.includes(infPlatformId);
       const matchFollowers = (inf.followers || 0) <= maxFollowers;
       const matchPrice = !inf.starting_price || inf.starting_price <= maxPrice;
-      return matchCategory && matchCity && matchQuery && matchPlatform && matchFollowers && matchPrice;
+      return matchNiche && matchState && matchQuery && matchPlatform && matchFollowers && matchPrice;
     });
     return [...filtered].sort((a, b) => {
       if (sort === "engagement") return b.engagement - a.engagement;
@@ -132,7 +141,7 @@ export default function Influencers() {
       if (sort === "newest") return a.name.localeCompare(b.name);
       return b.followers - a.followers;
     });
-  }, [influencers, category, city, query, sort, platforms, maxFollowers, maxPrice]);
+  }, [influencers, nicheFilter, stateFilter, query, sort, platformIds, maxFollowers, maxPrice]);
 
   function setFilter(patch) {
     setSearchParams((prev) => {
@@ -173,6 +182,9 @@ export default function Influencers() {
     }
   }
 
+  const nicheOptions = [{ value: "All", label: "All" }, ...niches.map((n) => ({ value: n._id || n.id, label: n.name }))];
+  const stateOptions = [{ value: "All", label: "All" }, ...states.map((s) => ({ value: s.code, label: s.name }))];
+
   return (
     <>
       <section className="relative overflow-hidden border-b border-border/60">
@@ -182,8 +194,8 @@ export default function Influencers() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="inline-flex items-center rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-gold"
-            style={{ background: "var(--gradient-ink)" }}
+            className="inline-flex items-center rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-black"
+            style={{ background: "var(--gradient-gold)" }}
           >
             Creator directory
           </motion.span>
@@ -202,7 +214,7 @@ export default function Influencers() {
             transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="mt-3 max-w-2xl text-sm text-muted-foreground"
           >
-            A handpicked directory of Indian creators — filter by category, city and engagement to
+            A handpicked directory of Indian creators — filter by niche, state and engagement to
             find the right voice for your campaign.
           </motion.p>
 
@@ -237,18 +249,18 @@ export default function Influencers() {
           className="space-y-6"
         >
           <FilterGroup
-            title="Filter by category"
-            options={["All", ...CATEGORIES]}
-            active={category}
-            onSelect={(value) => setFilter({ category: value === "All" ? undefined : value })}
+            title="Filter by niche"
+            options={nicheOptions}
+            active={nicheFilter}
+            onSelect={(value) => setFilter({ niche: value === "All" ? undefined : value })}
           />
           <FilterGroup
-            title="Filter by city"
-            options={["All", ...CITIES]}
-            active={city}
-            onSelect={(value) => setFilter({ city: value === "All" ? undefined : value })}
+            title="Filter by state"
+            options={stateOptions}
+            active={stateFilter}
+            onSelect={(value) => setFilter({ state: value === "All" ? undefined : value })}
           />
-          <PlatformFilter selected={platforms} onToggle={togglePlatform} />
+          <PlatformFilter platforms={platforms} selected={platformIds} onToggle={togglePlatform} />
           <RangeSlider
             title="Follower range"
             value={maxFollowers}
@@ -256,13 +268,13 @@ export default function Influencers() {
             onChange={setMaxFollowers}
             format={formatCount}
           />
-          <RangeSlider
+          {/* <RangeSlider
             title="Price range"
             value={maxPrice}
             max={MAX_PRICE}
             onChange={setMaxPrice}
             format={formatRupees}
-          />
+          /> */}
           <div className="surface-panel p-6">
             <h3 className="font-display text-lg font-semibold">Are you a creator?</h3>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -303,7 +315,7 @@ export default function Influencers() {
             <div className="surface-panel p-12 text-center">
               <p className="font-display text-lg">No creators match those filters</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Try widening the category, city or range filters.
+                Try widening the niche, state or range filters.
               </p>
             </div>
           ) : (

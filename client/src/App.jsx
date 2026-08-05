@@ -1,10 +1,11 @@
-import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router";
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from "react-router";
 import { AnimatePresence } from "framer-motion";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/AuthContext";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { DashboardLayout } from "@/components/site/DashboardLayout";
+import { GuestOnlyRoute, BrandOnlyRoute } from "@/components/site/RouteGuards";
 import { PageTransition } from "@/components/motion/PageTransition";
 import { ScrollProgressBar } from "@/components/motion/ScrollProgressBar";
 import Home from "@/pages/Home";
@@ -12,13 +13,20 @@ import Influencers from "@/pages/Influencers";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import DashCampaigns from "@/pages/DashCampaigns";
+import CreateCampaign from "@/pages/CreateCampaign";
 import DashOffers from "@/pages/DashOffers";
 import DashComingSoon from "@/pages/DashComingSoon";
 import DashProfile from "@/pages/DashProfile";
+import BuyConnects from "@/pages/BuyConnects";
+import ConnectWallet from "@/pages/ConnectWallet";
+import ConnectPurchaseHistory from "@/pages/ConnectPurchaseHistory";
+import PackagePurchaseHistory from "@/pages/PackagePurchaseHistory";
+import AdminCatalog from "@/pages/AdminCatalog";
 import Contact from "@/pages/Contact";
 import ForBrands from "@/pages/ForBrands";
 import SignupBrand from "@/pages/SignupBrand";
 import SignupInfluencer from "@/pages/SignupInfluencer";
+import SignupAdmin from "@/pages/SignupAdmin";
 
 function SiteLayout({ children }) {
   return (
@@ -39,30 +47,41 @@ function AnimatedRoutes() {
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="campaigns" element={<DashCampaigns />} />
+          <Route path="campaigns/new" element={<CreateCampaign />} />
           <Route path="offers" element={<DashOffers />} />
           <Route path="interests" element={<DashComingSoon title="Profile Interests" />} />
           <Route path="unlocks" element={<DashComingSoon title="URL Unlocks" />} />
           <Route path="earnings" element={<DashComingSoon title="My Earnings" />} />
-          <Route path="purchases" element={<DashComingSoon title="My Purchase" />} />
+          <Route path="purchases" element={<Navigate to="/dashboard/purchases/buy-connects" replace />} />
+          <Route path="purchases/buy-connects" element={<BuyConnects />} />
+          <Route path="purchases/wallet" element={<ConnectWallet />} />
+          <Route path="purchases/connect-history" element={<ConnectPurchaseHistory />} />
+          <Route path="purchases/package-history" element={<PackagePurchaseHistory />} />
           <Route path="others" element={<DashComingSoon title="Others" />} />
           <Route path="profile" element={<DashProfile />} />
+          <Route path="support" element={<Contact />} />
+          <Route path="admin/catalog" element={<AdminCatalog />} />
         </Route>
 
         {/* Public site routes */}
         <Route
           path="/"
           element={
-            <SiteLayout>
-              <Home />
-            </SiteLayout>
+            <GuestOnlyRoute>
+              <SiteLayout>
+                <Home />
+              </SiteLayout>
+            </GuestOnlyRoute>
           }
         />
         <Route
           path="/influencers"
           element={
-            <SiteLayout>
-              <Influencers />
-            </SiteLayout>
+            <BrandOnlyRoute>
+              <SiteLayout>
+                <Influencers />
+              </SiteLayout>
+            </BrandOnlyRoute>
           }
         />
         <Route
@@ -102,6 +121,14 @@ function AnimatedRoutes() {
           element={
             <SiteLayout>
               <SignupInfluencer />
+            </SiteLayout>
+          }
+        />
+        <Route
+          path="/signup/admin"
+          element={
+            <SiteLayout>
+              <SignupAdmin />
             </SiteLayout>
           }
         />

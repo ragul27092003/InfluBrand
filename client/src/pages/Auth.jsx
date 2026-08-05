@@ -62,7 +62,7 @@ export default function Auth() {
       <div className="hero-glow absolute inset-0" />
       <div className="relative mx-auto grid w-full max-w-5xl overflow-hidden rounded-3xl border border-border/60 lg:my-16 lg:grid-cols-2">
         {/* Left brand panel */}
-        <div className="relative hidden flex-col justify-between overflow-hidden bg-[image:var(--gradient-deep)] p-10 lg:flex">
+        <div className="relative hidden flex-col justify-between overflow-hidden bg-[image:var(--gradient-gold)] p-10 lg:flex">
           <div className="hero-glow absolute inset-0" />
           <div className="relative">
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[image:var(--gradient-mint)] font-display text-lg font-bold text-primary-foreground">

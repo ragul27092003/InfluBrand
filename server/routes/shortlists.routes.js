@@ -10,7 +10,7 @@ const router = Router();
 
 router.use(requireAuth);
 router.get("/", listMyShortlists);
-router.post("/", requireRole("brand"), createShortlist);
+router.post("/", createShortlist);
 router.patch("/:id", requireRole("influencer"), respondToShortlist);
 
 export default router;
