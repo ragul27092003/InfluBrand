@@ -1,6 +1,6 @@
 // Thin fetch wrapper around the Influbrand Express/MongoDB API.
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 const TOKEN_KEY = "influbrand_token";
 
 export function getToken() {
@@ -23,16 +23,22 @@ class ApiError extends Error {
 }
 
 async function apiFetch(path, { method = "GET", body, auth = true } = {}) {
-  const headers = { "Content-Type": "application/json" };
+  const headers = {};
+  
   if (auth) {
     const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
+  const isFormData = body instanceof FormData;
+  if (!isFormData && body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const res = await fetch(`${API_URL}${path}`, {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: isFormData ? body : (body !== undefined ? JSON.stringify(body) : undefined),
   });
 
   let data = null;
@@ -52,19 +58,44 @@ async function apiFetch(path, { method = "GET", body, auth = true } = {}) {
 }
 
 export const auth = {
+  sendOtp(email) {
+    return apiFetch("/api/auth/send-otp", { method: "POST", body: { email }, auth: false });
+  },
   async signup(payload) {
-    const data = await apiFetch("/api/auth/signup", { method: "POST", body: payload, auth: false });
+    const data = await apiFetch("/api/auth/signup", {
+      method: "POST",
+      body: payload,
+      auth: false,
+    });
     setToken(data.token);
     return data.user;
   },
   async login(email, password) {
-    const data = await apiFetch("/api/auth/login", { method: "POST", body: { email, password }, auth: false });
+    const data = await apiFetch("/api/auth/login", {
+      method: "POST",
+      body: { email, password },
+      auth: false,
+    });
     setToken(data.token);
     return data.user;
   },
   async me() {
     const data = await apiFetch("/api/auth/me");
     return data.user;
+  },
+  deleteMe() {
+    return apiFetch("/api/auth/me", { method: "DELETE" });
+  },
+  updateSettings(payload) {
+    return apiFetch("/api/auth/me/settings", { method: "PATCH", body: payload });
+  },
+  exportData() {
+    // This returns a blob, so we might need a custom fetch wrapper, but we can just use the standard one
+    // and parse it out in the component, or we can use native fetch.
+    const token = getToken();
+    return fetch(`${API_URL}/api/auth/me/export`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(res => res.blob());
   },
   logout() {
     setToken(null);
@@ -140,6 +171,51 @@ export const locations = {
   },
 };
 
+export const admin = {
+  listInfluencers: () =>
+    apiFetch("/api/influencers/admin/list"),
+  verifyInfluencer: (id, is_verified) =>
+    apiFetch(`/api/influencers/admin/${id}/verify`, {
+      method: "PATCH",
+      body: { isVerified: is_verified },
+    }),
+  getStats: () => apiFetch("/api/admin/stats"),
+  getHistoricalStats: () => apiFetch("/api/admin/stats/historical"),
+  getUsers: (params) => {
+    const qs = new URLSearchParams(params).toString();
+    return apiFetch(`/api/admin/users?${qs}`);
+  },
+  getUserDetails: (id) => apiFetch(`/api/admin/users/${id}/details`),
+  editUser: (id, data) => apiFetch(`/api/admin/users/${id}`, {
+    method: "PATCH",
+    body: data
+  }),
+  deleteUser: (id) => apiFetch(`/api/admin/users/${id}`, {
+    method: "DELETE"
+  }),
+  toggleSuspension: (id, isSuspended) =>
+    apiFetch(`/api/admin/users/${id}/suspend`, {
+      method: "PATCH",
+      body: { isSuspended },
+    }),
+  impersonateUser: (id) => apiFetch(`/api/admin/users/${id}/impersonate`, {
+    method: "POST"
+  }),
+  getCampaigns: (params) => {
+    const qs = new URLSearchParams(params).toString();
+    return apiFetch(`/api/admin/campaigns?${qs}`);
+  },
+  updateCampaignStatus: (id, status) => apiFetch(`/api/admin/campaigns/${id}/status`, {
+    method: "PATCH",
+    body: { status }
+  }),
+  getTransactions: (params) => {
+    const qs = new URLSearchParams(params).toString();
+    return apiFetch(`/api/admin/transactions?${qs}`);
+  },
+  getActivity: () => apiFetch("/api/admin/activity")
+};
+
 export const brands = {
   me() {
     return apiFetch("/api/brands/me");
@@ -168,6 +244,9 @@ export const campaigns = {
   list() {
     return apiFetch("/api/campaigns");
   },
+  get(id) {
+    return apiFetch(`/api/campaigns/${id}`);
+  },
   browse() {
     return apiFetch("/api/campaigns/browse");
   },
@@ -195,6 +274,18 @@ export const shortlists = {
   respond(id, response) {
     return apiFetch(`/api/shortlists/${id}`, { method: "PATCH", body: { response } });
   },
+  unlock(id) {
+    return apiFetch(`/api/shortlists/${id}/unlock`, { method: "PATCH" });
+  },
+  submitTask(id, taskLink) {
+    return apiFetch(`/api/shortlists/${id}/submit`, { method: "POST", body: { taskLink } });
+  },
+  approveTask(id) {
+    return apiFetch(`/api/shortlists/${id}/approve`, { method: "POST" });
+  },
+  rejectTask(id) {
+    return apiFetch(`/api/shortlists/${id}/reject`, { method: "POST" });
+  },
 };
 
 export const messages = {
@@ -212,6 +303,15 @@ export const messages = {
 export const contact = {
   submit(payload) {
     return apiFetch("/api/contact", { method: "POST", body: payload, auth: false });
+  },
+};
+
+export const transactions = {
+  me() {
+    return apiFetch("/api/transactions/me");
+  },
+  withdraw() {
+    return apiFetch("/api/transactions/withdraw", { method: "POST" });
   },
 };
 

@@ -7,8 +7,12 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const [isImpersonating, setIsImpersonating] = useState(false);
+
   const refreshUser = useCallback(async () => {
     const token = getToken();
+    setIsImpersonating(!!localStorage.getItem("adminToken"));
+    
     if (!token) {
       setUser(null);
       setLoading(false);
@@ -27,8 +31,30 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const impersonate = useCallback((token, u) => {
+    const currentToken = getToken();
+    if (currentToken) {
+      localStorage.setItem("adminToken", currentToken);
+    }
+    setToken(token);
+    setUser(u);
+    setIsImpersonating(true);
+  }, []);
+
+  const stopImpersonating = useCallback(() => {
+    const adminToken = localStorage.getItem("adminToken");
+    if (adminToken) {
+      setToken(adminToken);
+      localStorage.removeItem("adminToken");
+    }
+    setIsImpersonating(false);
+    refreshUser();
+  }, [refreshUser]);
+
   const logout = useCallback(() => {
     setToken(null);
+    localStorage.removeItem("adminToken");
+    setIsImpersonating(false);
     setUser(null);
   }, []);
 
@@ -40,7 +66,10 @@ export function AuthProvider({ children }) {
     user,
     accountType: user?.accountType ?? null,
     loading,
+    isImpersonating,
     refreshUser,
+    impersonate,
+    stopImpersonating,
     logout,
   };
 

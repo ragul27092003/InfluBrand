@@ -1,4 +1,5 @@
 import { BadgeCheck, Heart, Instagram, Send, Star, Youtube, Music2, Facebook, Twitter, Linkedin, Globe } from "lucide-react";
+import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { formatCount, formatRupees, initials, derivedRating } from "@/lib/catalog";
 
@@ -20,10 +21,11 @@ function Stat({ label, value }) {
   );
 }
 
-export function InfluencerCard({ influencer, onShortlist, onOffer, actionLabel, busy }) {
-  const platform = influencer.platform; // populated Platform doc, or null
+export function InfluencerCard({ influencer, onShortlist, onOffer, actionLabel, busy, isShortlisted, isOffered, isDashboard = false }) {
+  const platform = influencer.platforms && influencer.platforms.length > 0 ? influencer.platforms[0] : null; // Use first platform from array
   const PlatformIcon = PLATFORM_ICON[platform?.slug] || Globe;
   const rating = derivedRating(influencer);
+  const basePath = isDashboard ? "/dashboard/influencers" : "/influencers";
 
   return (
     <article className="surface-panel flex flex-col overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-[var(--shadow-premium)]">
@@ -45,7 +47,7 @@ export function InfluencerCard({ influencer, onShortlist, onOffer, actionLabel, 
         )}
         <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-xs text-white/80 backdrop-blur">
           <PlatformIcon className="size-3.5" />
-          {platform?.name || "Instagram"}
+          {platform?.name || "Platform"}
         </span>
         <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-gold" style={{ background: "oklch(0.16 0.02 250 / 0.55)" }}>
           <Star className="size-3.5 fill-current" />
@@ -56,11 +58,16 @@ export function InfluencerCard({ influencer, onShortlist, onOffer, actionLabel, 
       <div className="flex flex-1 flex-col gap-3 p-5">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h3 className="flex items-center gap-1.5 font-display text-lg font-semibold">
-              {influencer.name}
-              {influencer.is_verified && <BadgeCheck className="size-4 text-primary" />}
-            </h3>
+            <Link to={`${basePath}/${influencer.id || influencer._id}`} className="hover:underline">
+              <h3 className="flex items-center gap-1.5 font-display text-lg font-semibold">
+                {influencer.name}
+                {influencer.is_verified && <BadgeCheck className="size-4 text-primary" />}
+              </h3>
+            </Link>
             <p className="text-xs text-muted-foreground">{influencer.city}</p>
+            <Link to={`${basePath}/${influencer.id || influencer._id}`} className="mt-1 text-[11px] font-medium text-primary hover:underline block">
+              View Profile
+            </Link>
           </div>
           <div className="text-right">
             <p className="font-display text-lg font-bold text-primary">
@@ -93,22 +100,29 @@ export function InfluencerCard({ influencer, onShortlist, onOffer, actionLabel, 
 
         <div className="mt-auto flex gap-2 pt-2">
           <Button
-            variant="soft"
+            variant={isShortlisted ? "secondary" : "soft"}
             size="icon"
             aria-label="Add to shortlist"
-            disabled={busy}
+            disabled={busy || isShortlisted}
             onClick={() => onShortlist?.(influencer)}
+            className={isShortlisted ? "text-red-500" : ""}
           >
-            <Heart className="size-4" />
+            <Heart className={`size-4 ${isShortlisted ? "fill-current" : ""}`} />
           </Button>
           <Button
-            variant="hero"
+            variant={isOffered ? "secondary" : "hero"}
             className="flex-1"
-            disabled={busy}
+            disabled={busy || isOffered}
             onClick={() => onOffer?.(influencer)}
           >
-            <Send className="size-4" />
-            {actionLabel ?? "Send offer"}
+            {isOffered ? (
+              "Applied"
+            ) : (
+              <>
+                <Send className="size-4" />
+                {actionLabel ?? "Send offer"}
+              </>
+            )}
           </Button>
         </div>
       </div>

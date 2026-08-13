@@ -32,6 +32,52 @@ const influencerSchema = new mongoose.Schema(
     startingPrice: { type: Number, default: null },
     isVerified: { type: Boolean, default: false },
     isPublished: { type: Boolean, default: true },
+
+    // Added for real data integration
+    socialLinks: {
+      instagram: { type: String, default: null },
+      youtube: { type: String, default: null },
+      linkedin: { type: String, default: null },
+      twitter: { type: String, default: null },
+      facebook: { type: String, default: null },
+    },
+    primaryPlatform: { type: String, default: null },
+    source: { type: String, default: "seed" },
+    lastScrapedAt: { type: Date, default: null },
+
+    // Additional Profile Fields (from Dashboard)
+    aboutMe: { type: String, default: "" },
+    previousBrands: [{ companyName: String, city: String }],
+    workSamples: [{ title: String, url: String, description: String }],
+    languages: { type: [String], default: [] },
+    socialAssets: { type: Object, default: {} },
+    rates: [{ activityType: String, priceINR: Number }],
+    termsAccepted: { type: Boolean, default: false },
+    paymentDetails: {
+      accountHolderName: { type: String, default: "" },
+      bankName: { type: String, default: "" },
+      accountNumber: { type: String, default: "" },
+      ifscCode: { type: String, default: "" },
+      upiId: { type: String, default: "" },
+    },
+    influBrandScore: { type: Number, default: 0 },
+    account_balance: { type: Number, default: 0 },
+
+    // Analytics and Profile Real Data
+    hashtags: { type: [String], default: [] },
+    mentions: { type: [String], default: [] },
+    growthHistory: {
+      type: [{ date: String, followers: Number, posts: Number }],
+      default: []
+    },
+    dailyStats: {
+      type: [{ date: String, likes: Number, comments: Number, posts: Number, videos: Number }],
+      default: []
+    },
+    recentPosts: {
+      type: [{ imageUrl: String, likes: Number, comments: Number, date: String }],
+      default: []
+    },
   },
   { timestamps: true }
 );

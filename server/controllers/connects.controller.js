@@ -1,5 +1,6 @@
 import { Brand } from "../models/Brand.js";
 import { ConnectPurchase } from "../models/ConnectPurchase.js";
+import { ConnectUsage } from "../models/ConnectUsage.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 // INR pricing — connect packages a brand can buy to unlock applicant contact
@@ -51,6 +52,21 @@ export const purchaseConnects = asyncHandler(async (req, res) => {
   brand.connectBalance = (brand.connectBalance || 0) + pkg.connects;
   await brand.save();
 
+  // Send Purchase Receipt Email
+  import("../models/User.js").then(({ User }) => {
+    User.findById(req.user._id).select("email notificationPreferences").then(user => {
+      // Check if user has disabled email notifications for purchases (assuming we store this in preferences)
+      if (user && user.email && user.notificationPreferences?.email !== false) {
+        import("../utils/email.js")
+          .then(({ sendPurchaseReceiptEmail }) => {
+            sendPurchaseReceiptEmail(user.email, pkg.key.toUpperCase(), pkg.connects, pkg.priceInr)
+              .catch(console.error);
+          })
+          .catch(console.error);
+      }
+    }).catch(console.error);
+  });
+
   res.status(201).json({ purchase: purchaseToClientShape(purchase), connectBalance: brand.connectBalance });
 });
 
@@ -64,21 +80,46 @@ export const listPurchases = asyncHandler(async (req, res) => {
 });
 
 // GET /api/connects/wallet — ledger view: every purchase credits connects,
-// running balance shown alongside each entry.
+// every unlock debits connects, running balance shown alongside each entry.
 export const listWallet = asyncHandler(async (req, res) => {
   const brand = await findBrand(req.user._id);
   if (!brand) return res.json([]);
-  const purchases = await ConnectPurchase.find({ brandId: brand._id }).sort({ createdAt: 1 });
+  
+  const purchases = await ConnectPurchase.find({ brandId: brand._id });
+  const usages = await ConnectUsage.find({ brandId: brand._id });
 
-  let running = 0;
-  const ledger = purchases.map((p) => {
-    running += p.connects;
-    return {
-      id: p._id.toString(),
+  const transactions = [
+    ...purchases.map(p => ({
       date: p.createdAt,
       description: `${p.connects} Connects Added`,
       debited: null,
       credited: p.connects,
+      type: "credit",
+      id: p._id.toString()
+    })),
+    ...usages.map(u => ({
+      date: u.createdAt,
+      description: `Unlocked Contact Details`,
+      debited: u.connects,
+      credited: null,
+      type: "debit",
+      id: u._id.toString()
+    }))
+  ];
+
+  transactions.sort((a, b) => a.date - b.date);
+
+  let running = 0;
+  const ledger = transactions.map((t) => {
+    if (t.type === "credit") running += t.credited;
+    else running -= t.debited;
+    
+    return {
+      id: t.id,
+      date: t.date,
+      description: t.description,
+      debited: t.debited,
+      credited: t.credited,
       closingBalance: running,
     };
   });

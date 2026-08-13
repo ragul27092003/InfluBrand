@@ -1,5 +1,6 @@
 import { Message } from "../models/Message.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { getReceiverSocketId, getIo } from "../socket.js";
 
 // GET /api/messages — everything sent to or by the signed-in user
 export const listMyMessages = asyncHandler(async (req, res) => {
@@ -26,7 +27,38 @@ export const sendMessage = asyncHandler(async (req, res) => {
     subject: subject || null,
     body,
   });
-  res.status(201).json(message);
+
+  // Send New Message Email
+  import("../models/User.js").then(({ User }) => {
+    User.findById(recipientId).select("email notificationPreferences").then(recipient => {
+      // Check if user has disabled email notifications for messages (assuming we store this in preferences)
+      if (recipient && recipient.email && recipient.notificationPreferences?.email !== false) {
+        import("../utils/email.js")
+          .then(({ sendNewMessageEmail }) => {
+            sendNewMessageEmail(recipient.email, req.user.fullName || "A user", subject || "New Message")
+              .catch(console.error);
+          })
+          .catch(console.error);
+      }
+    }).catch(console.error);
+  });
+
+  // Populate the message to match the GET /api/messages shape
+  const populatedMessage = await Message.findById(message._id)
+    .populate("senderId", "fullName email")
+    .populate("recipientId", "fullName email");
+
+  // Socket.io: emit the message only to the recipient in real-time.
+  // The sender already receives the message via the HTTP response, so we
+  // do NOT emit back to the sender — doing so caused race-condition
+  // duplicates that produced ghost "self" contacts in the conversation list.
+  const recipientSocketId = getReceiverSocketId(recipientId);
+
+  if (recipientSocketId) {
+    getIo().to(recipientSocketId).emit("newMessage", populatedMessage);
+  }
+
+  res.status(201).json(populatedMessage);
 });
 
 // PATCH /api/messages/:id/read — recipient marks a message as read

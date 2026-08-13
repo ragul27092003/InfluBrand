@@ -10,6 +10,12 @@ const userSchema = new mongoose.Schema(
     city: { type: String, default: null },
     avatarUrl: { type: String, default: null },
     accountType: { type: String, enum: ["influencer", "brand", "admin"], required: true, default: "influencer" },
+    isSuspended: { type: Boolean, default: false },
+    notificationPreferences: {
+      emailAlerts: { type: Boolean, default: true },
+      smsAlerts: { type: Boolean, default: false },
+      marketing: { type: Boolean, default: false },
+    },
   },
   { timestamps: true }
 );
@@ -31,6 +37,8 @@ userSchema.methods.toPublicJSON = function toPublicJSON() {
     city: this.city,
     avatarUrl: this.avatarUrl,
     accountType: this.accountType,
+    isSuspended: this.isSuspended,
+    notificationPreferences: this.notificationPreferences,
     createdAt: this.createdAt,
   };
 };

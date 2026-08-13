@@ -98,15 +98,57 @@ function DetailsModal({ campaign, onClose }) {
 
 function ApplicantsModal({ campaign, onClose }) {
   const [applicants, setApplicants] = useState([]);
+  const [filteredApplicants, setFilteredApplicants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filterState, setFilterState] = useState("all");
 
   useEffect(() => {
     campaignsApi
       .applicants(campaign._id)
-      .then(setApplicants)
-      .catch(() => setApplicants([]))
+      .then((data) => {
+        setApplicants(data);
+        setFilteredApplicants(data);
+      })
+      .catch(() => {
+        setApplicants([]);
+        setFilteredApplicants([]);
+      })
       .finally(() => setLoading(false));
   }, [campaign._id]);
+
+  useEffect(() => {
+    if (filterState === "all") {
+      setFilteredApplicants(applicants);
+    } else if (filterState === "unlocked") {
+      setFilteredApplicants(applicants.filter(a => a.isUnlocked || a.kind === "offer"));
+    } else if (filterState === "locked") {
+      setFilteredApplicants(applicants.filter(a => !a.isUnlocked && a.kind !== "offer"));
+    } else if (filterState === "offered") {
+      setFilteredApplicants(applicants.filter(a => a.kind === "offer"));
+    }
+  }, [filterState, applicants]);
+
+  async function handleUnlock(shortlistId) {
+    try {
+      await shortlistsApi.unlock(shortlistId);
+      const refreshed = await campaignsApi.applicants(campaign._id);
+      setApplicants(refreshed);
+      toast.success("Contact unlocked!");
+    } catch (err) {
+      toast.error(err.message || "Unlock failed.");
+    }
+  }
+
+  async function handleOffer(influencerId) {
+    try {
+      await shortlistsApi.create({ influencerId, campaignId: campaign._id, kind: "offer" });
+      const refreshed = await campaignsApi.applicants(campaign._id);
+      setApplicants(refreshed);
+      toast.success("Offer sent to the influencer!");
+    } catch (err) {
+      toast.error(err.message || "Failed to send offer.");
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 py-10">
@@ -119,6 +161,21 @@ function ApplicantsModal({ campaign, onClose }) {
             <X className="size-4" />
           </button>
         </div>
+        
+        <div className="border-b border-border px-6 py-3 bg-muted/10 flex items-center gap-4">
+          <span className="text-sm font-semibold text-muted-foreground">Filter:</span>
+          <select 
+            value={filterState} 
+            onChange={(e) => setFilterState(e.target.value)}
+            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+          >
+            <option value="all">All Applicants ({applicants.length})</option>
+            <option value="unlocked">Unlocked ({applicants.filter(a => a.isUnlocked || a.kind === "offer").length})</option>
+            <option value="locked">Locked ({applicants.filter(a => !a.isUnlocked && a.kind !== "offer").length})</option>
+            <option value="offered">Offered ({applicants.filter(a => a.kind === "offer").length})</option>
+          </select>
+        </div>
+
         <div className="overflow-x-auto px-6 py-4">
           <table className="w-full text-sm">
             <thead>
@@ -127,15 +184,16 @@ function ApplicantsModal({ campaign, onClose }) {
                 <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Influencer Image</th>
                 <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Influencer Info</th>
                 <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Contact Details</th>
+                <th className="px-3 py-2 text-right font-semibold text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
               {loading ? (
-                <EmptyRow colSpan={4} message="Loading…" />
-              ) : applicants.length === 0 ? (
-                <EmptyRow colSpan={4} message="No Record(s)" />
+                <EmptyRow colSpan={5} message="Loading…" />
+              ) : filteredApplicants.length === 0 ? (
+                <EmptyRow colSpan={5} message="No Record(s)" />
               ) : (
-                applicants.map((a, i) => (
+                filteredApplicants.map((a, i) => (
                   <tr key={a._id}>
                     <td className="px-3 py-2">{i + 1}</td>
                     <td className="px-3 py-2">
@@ -145,8 +203,36 @@ function ApplicantsModal({ campaign, onClose }) {
                         <span className="flex size-10 items-center justify-center rounded-full bg-muted text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2">{a.influencerId?.name || "—"}</td>
-                    <td className="px-3 py-2">{a.influencerId?.email || a.influencerId?.phone || "—"}</td>
+                    <td className="px-3 py-2">
+                      {a.influencerId?.name ? (
+                        <Link to={`/p/${a.influencerId._id}`} target="_blank" className="font-semibold text-primary hover:underline">
+                          {a.influencerId.name}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {(a.influencerId?.email || a.influencerId?.phone) ? (
+                        <div>
+                          {a.influencerId?.email && <div>{a.influencerId.email}</div>}
+                          {a.influencerId?.phone && <div>{a.influencerId.phone}</div>}
+                        </div>
+                      ) : (
+                        <Button size="sm" variant="soft" onClick={() => handleUnlock(a._id)}>
+                          Unlock (1 Connect)
+                        </Button>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {a.kind === "offer" ? (
+                        <span className="text-xs font-semibold text-primary">Offer Sent</span>
+                      ) : (
+                        <Button size="sm" variant="hero" onClick={() => handleOffer(a.influencerId?._id)}>
+                          Send Offer
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
@@ -175,14 +261,20 @@ function ActionMenu({ campaign, onView, onViewApplicants, onDelete }) {
             >
               View Details
             </button>
+            <Link
+              to={`/dashboard/campaigns/${campaign._id}/edit`}
+              className="block w-full px-4 py-2 text-left text-sm hover:bg-muted"
+            >
+              Edit Campaign
+            </Link>
             <button
               className="block w-full px-4 py-2 text-left text-sm hover:bg-muted"
               onClick={() => { setOpen(false); onViewApplicants(campaign); }}
             >
-              View Influencers
+              View Applicants
             </button>
             <button
-              className="block w-full px-4 py-2 text-left text-sm text-destructive hover:bg-muted"
+              className="block w-full px-4 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
               onClick={() => { setOpen(false); onDelete(campaign._id); }}
             >
               Delete
@@ -194,9 +286,13 @@ function ActionMenu({ campaign, onView, onViewApplicants, onDelete }) {
   );
 }
 
-function InfluencerCampaignRow({ campaign, onApplied }) {
+function InfluencerCampaignRow({ campaign, isAppliedInitially, applyText = "Applied", onApplied }) {
   const [applying, setApplying] = useState(false);
-  const [applied, setApplied] = useState(false);
+  const [applied, setApplied] = useState(isAppliedInitially);
+
+  useEffect(() => {
+    setApplied(isAppliedInitially);
+  }, [isAppliedInitially]);
 
   async function apply() {
     setApplying(true);
@@ -229,7 +325,7 @@ function InfluencerCampaignRow({ campaign, onApplied }) {
       </td>
       <td className="px-4 py-3 text-right">
         <Button size="sm" variant={applied ? "soft" : "hero"} disabled={applying || applied} onClick={apply}>
-          {applied ? "Applied" : applying ? "Applying…" : "Apply"}
+          {applied ? applyText : applying ? "Applying…" : "Apply"}
         </Button>
       </td>
     </tr>
@@ -238,12 +334,18 @@ function InfluencerCampaignRow({ campaign, onApplied }) {
 
 function InfluencerCampaignsView() {
   const [campaigns, setCampaigns] = useState([]);
+  const [myApplications, setMyApplications] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    campaignsApi
-      .browse()
-      .then(setCampaigns)
+    Promise.all([
+      campaignsApi.browse(),
+      shortlistsApi.list()
+    ])
+      .then(([camps, lists]) => {
+        setCampaigns(camps);
+        setMyApplications(lists.filter(l => l.campaignId));
+      })
       .catch(() => setCampaigns([]))
       .finally(() => setLoading(false));
   }, []);
@@ -269,7 +371,22 @@ function InfluencerCampaignsView() {
             ) : campaigns.length === 0 ? (
               <EmptyRow colSpan={3} message="No open campaigns right now. Check back soon." />
             ) : (
-              campaigns.map((c) => <InfluencerCampaignRow key={c._id} campaign={c} />)
+              campaigns.map((c) => {
+                const listStatus = myApplications.find(app => String(app.campaignId?._id || app.campaignId) === String(c._id));
+                const isApplied = !!listStatus;
+                let text = "Applied";
+                if (listStatus?.kind === "offer") text = "Offer Received";
+                else if (listStatus?.kind === "shortlist") text = "Shortlisted";
+
+                return (
+                  <InfluencerCampaignRow 
+                    key={c._id} 
+                    campaign={c} 
+                    isAppliedInitially={isApplied} 
+                    applyText={text}
+                  />
+                );
+              })
             )}
           </tbody>
         </table>
@@ -284,6 +401,7 @@ export default function DashCampaigns() {
   const [loading, setLoading] = useState(true);
   const [detailsCampaign, setDetailsCampaign] = useState(null);
   const [applicantsCampaign, setApplicantsCampaign] = useState(null);
+  const [openActionMenuId, setOpenActionMenuId] = useState(null);
   const [connectBalance, setConnectBalance] = useState(null);
 
   useEffect(() => {
@@ -342,6 +460,21 @@ export default function DashCampaigns() {
         </Button>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="surface-panel p-6 flex flex-col items-center justify-center text-center">
+          <span className="text-3xl font-bold font-display text-primary mb-1">{campaigns.length}</span>
+          <span className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Total Campaigns</span>
+        </div>
+        <div className="surface-panel p-6 flex flex-col items-center justify-center text-center">
+          <span className="text-3xl font-bold font-display text-green-500 mb-1">{campaigns.filter(c => c.status === 'active').length}</span>
+          <span className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Active Campaigns</span>
+        </div>
+        <div className="surface-panel p-6 flex flex-col items-center justify-center text-center">
+          <span className="text-3xl font-bold font-display text-amber-500 mb-1">{campaigns.reduce((sum, c) => sum + (c.applicantCount || 0), 0)}</span>
+          <span className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Total Applicants</span>
+        </div>
+      </div>
+
       <div className="surface-panel overflow-hidden">
         <div className="border-b border-border px-6 py-4">
           <h2 className="font-display text-lg font-bold">My Campaigns</h2>
@@ -352,15 +485,16 @@ export default function DashCampaigns() {
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">#</th>
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Campaign Info</th>
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Applicants</th>
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Brand Info</th>
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
               {loading ? (
-                <EmptyRow colSpan={4} message="Loading campaigns…" />
+                <EmptyRow colSpan={5} message="Loading campaigns…" />
               ) : campaigns.length === 0 ? (
-                <EmptyRow colSpan={4} message="No campaigns yet. Create your first campaign to get started." />
+                <EmptyRow colSpan={5} message="No campaigns yet. Create your first campaign to get started." />
               ) : (
                 campaigns.map((c, i) => (
                   <tr key={c._id} className="align-top transition-colors hover:bg-muted/20">
@@ -377,6 +511,14 @@ export default function DashCampaigns() {
                           Current Status: <span className={`rounded-full px-2 py-0.5 font-medium capitalize ${statusColors[c.status] || statusColors.pending}`}>{c.status}</span>
                         </p>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button 
+                        onClick={() => setApplicantsCampaign(c)}
+                        className="inline-flex items-center justify-center rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
+                      >
+                        {c.applicantCount || 0} Applied
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-xs">
                       <p><span className="font-semibold">Promotion Type:</span> <span className="capitalize">{c.promotionType || "—"}</span></p>

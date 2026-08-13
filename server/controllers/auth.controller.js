@@ -3,30 +3,60 @@ import { Brand } from "../models/Brand.js";
 import { Influencer } from "../models/Influencer.js";
 import { Platform } from "../models/Platform.js";
 import { Niche } from "../models/Niche.js";
+import { Otp } from "../models/Otp.js";
 import { signToken } from "../utils/jwt.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { assertIdsExist } from "../utils/validateRefs.js";
+import { sendOtpEmail } from "../utils/email.js";
+
+// POST /api/auth/send-otp
+export const sendOtp = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Email is required" });
+
+  const existingUser = await User.findOne({ email });
+  if (existingUser) return res.status(400).json({ error: "Email already in use" });
+
+  // Generate 6-digit OTP
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+  await Otp.deleteMany({ email });
+  await Otp.create({ email, otp: otpCode });
+
+  console.log(`[OTP GENERATED] Email: ${email} | Code: ${otpCode}`);
+  
+  await sendOtpEmail(email, otpCode);
+  
+  res.json({ message: "OTP sent successfully" });
+});
 
 // POST /api/auth/signup
 // Creates the User plus its matching Brand or Influencer profile row,
 // mirroring what the old Supabase `ensureAccountRecords()` trigger-on-login did —
 // except here it happens once, atomically, at signup time.
 export const signup = asyncHandler(async (req, res) => {
-  const { email, password, accountType, fullName, phone, state, district, city, adminSecret } =
+  const { email, password, accountType, fullName, phone, state, district, city, adminSecret, otp } =
     req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
+  
   if (password.length < 6) {
     return res.status(400).json({ error: "Password must be at least 6 characters" });
   }
   if (!["brand", "influencer", "admin"].includes(accountType)) {
     return res.status(400).json({ error: "accountType must be 'brand', 'influencer' or 'admin'" });
   }
+
   if (accountType === "admin") {
     if (!process.env.ADMIN_SIGNUP_SECRET || adminSecret !== process.env.ADMIN_SIGNUP_SECRET) {
       return res.status(403).json({ error: "Invalid admin invite code" });
+    }
+  } else {
+    const validOtp = await Otp.findOne({ email, otp });
+    if (!validOtp) {
+      return res.status(400).json({ error: "Invalid or expired OTP" });
     }
   }
 
@@ -56,8 +86,11 @@ export const signup = asyncHandler(async (req, res) => {
   await user.save();
 
   try {
+    const fileUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
     if (accountType === "brand") {
-      const { companyName, website, nicheId, logoUrl } = req.body;
+      const { companyName, website, nicheId } = req.body;
+      const logoUrl = req.body.logoUrl || fileUrl;
       await Brand.create({
         userId: user._id,
         companyName: companyName || fullName || "My brand",
@@ -70,7 +103,22 @@ export const signup = asyncHandler(async (req, res) => {
         logoUrl: logoUrl || null,
       });
     } else if (accountType === "influencer") {
-      const { handle, platforms, gender, niches, avatarUrl, followers, startingPrice } = req.body;
+      const { handle, gender, followers, startingPrice } = req.body;
+      let { platforms, niches, languages, socialLinks } = req.body;
+      
+      // When formData is used, arrays might be comma-separated strings or single values
+      if (typeof platforms === "string") platforms = platforms.split(",");
+      if (typeof niches === "string") niches = niches.split(",");
+      if (typeof languages === "string") languages = languages.split(",");
+      
+      let parsedSocials = {};
+      if (socialLinks) {
+        try {
+          parsedSocials = JSON.parse(socialLinks);
+        } catch (e) {}
+      }
+
+      const avatarUrl = req.body.avatarUrl || fileUrl;
       await Influencer.create({
         userId: user._id,
         name: fullName || "New creator",
@@ -78,9 +126,11 @@ export const signup = asyncHandler(async (req, res) => {
         district: district || null,
         city: city || district || "Mumbai",
         gender: gender || null,
-        platforms: Array.isArray(platforms) ? platforms : [],
+        platforms: Array.isArray(platforms) ? platforms : (platforms ? [platforms] : []),
         handle: handle || null,
-        niches: Array.isArray(niches) ? niches : [],
+        niches: Array.isArray(niches) ? niches : (niches ? [niches] : []),
+        languages: Array.isArray(languages) ? languages : (languages ? [languages] : []),
+        socialAssets: parsedSocials,
         avatarUrl: avatarUrl || null,
         followers: followers ? Number(followers) : 0,
         startingPrice: startingPrice ? Number(startingPrice) : null,
@@ -97,6 +147,7 @@ export const signup = asyncHandler(async (req, res) => {
   }
 
   const token = signToken(user);
+  await Otp.deleteMany({ email });
   res.status(201).json({ token, user: user.toPublicJSON() });
 });
 
@@ -112,6 +163,10 @@ export const login = asyncHandler(async (req, res) => {
     return res.status(401).json({ error: "Invalid email or password" });
   }
 
+  if (user.isSuspended) {
+    return res.status(403).json({ error: "Your account has been suspended. Please contact support." });
+  }
+
   const token = signToken(user);
   res.json({ token, user: user.toPublicJSON() });
 });
@@ -119,4 +174,70 @@ export const login = asyncHandler(async (req, res) => {
 // GET /api/auth/me
 export const me = asyncHandler(async (req, res) => {
   res.json({ user: req.user.toPublicJSON() });
+});
+
+// DELETE /api/auth/me
+export const deleteMe = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const accountType = req.user.accountType;
+
+  if (accountType === "brand") {
+    await Brand.findOneAndDelete({ userId });
+  } else if (accountType === "influencer") {
+    await Influencer.findOneAndDelete({ userId });
+  }
+
+  await User.findByIdAndDelete(userId);
+  res.json({ success: true, message: "Account completely deleted" });
+});
+
+// PATCH /api/auth/me/settings
+export const updateSettings = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword, notificationPreferences } = req.body;
+  const user = await User.findById(req.user._id);
+
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  if (currentPassword && newPassword) {
+    const isMatch = await user.checkPassword(currentPassword);
+    if (!isMatch) return res.status(400).json({ error: "Incorrect current password" });
+    if (newPassword.length < 6) return res.status(400).json({ error: "New password must be at least 6 characters" });
+    
+    await user.setPassword(newPassword);
+  }
+
+  if (notificationPreferences) {
+    user.notificationPreferences = {
+      ...user.notificationPreferences,
+      ...notificationPreferences
+    };
+  }
+
+  await user.save();
+  res.json({ message: "Settings updated successfully", user: user.toPublicJSON() });
+});
+
+// GET /api/auth/me/export
+export const exportData = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  let profile = null;
+  if (user.accountType === "influencer") {
+    profile = await Influencer.findOne({ userId: user._id })
+      .populate("niches platforms");
+  } else if (user.accountType === "brand") {
+    profile = await Brand.findOne({ userId: user._id })
+      .populate("nicheId");
+  }
+
+  const exportData = {
+    account: user.toPublicJSON(),
+    profile,
+    exportDate: new Date().toISOString()
+  };
+
+  res.setHeader("Content-Disposition", 'attachment; filename="my_data_export.json"');
+  res.setHeader("Content-Type", "application/json");
+  res.status(200).send(JSON.stringify(exportData, null, 2));
 });

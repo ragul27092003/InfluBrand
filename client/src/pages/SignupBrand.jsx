@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
-import { Building2, Camera, ArrowLeft, ArrowRight } from "lucide-react";
+import { Building2, Camera, ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,7 @@ import { auth } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { useCatalog } from "@/hooks/useCatalog";
 
-const STEPS = ["Account", "Business"];
+const STEPS = ["Account", "Verify", "Business"];
 
 function Field({ label, required, children }) {
   return (
@@ -48,6 +48,8 @@ export default function SignupBrand() {
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
   const [logoPreview, setLogoPreview] = useState(null);
+  const [otpSent, setOtpSent] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
   const { niches } = useCatalog();
   const [form, setForm] = useState({
     full_name: "",
@@ -59,6 +61,7 @@ export default function SignupBrand() {
     nicheId: "",
     state: "",
     district: "",
+    otp: "",
   });
 
   function set(key, value) {
@@ -79,7 +82,23 @@ export default function SignupBrand() {
 
   function handleNext(e) {
     e.preventDefault();
-    if (validateStep1()) setStep(2);
+    if (validateStep1()) {
+      setStep(2);
+      if (!otpSent) sendOtp();
+    }
+  }
+
+  async function sendOtp() {
+    setSendingOtp(true);
+    try {
+      await auth.sendOtp({ email: form.email });
+      setOtpSent(true);
+      toast.success(`Verification code sent to ${form.email}`);
+    } catch (err) {
+      toast.error(err.message || "Failed to send verification code");
+    } finally {
+      setSendingOtp(false);
+    }
   }
 
   async function handleLogoChange(e) {
@@ -97,20 +116,25 @@ export default function SignupBrand() {
     }
     setBusy(true);
     try {
-      await auth.signup({
-        email: form.email,
-        password: form.password,
-        accountType: "brand",
-        fullName: form.full_name,
-        companyName: form.company_name,
-        phone: form.phone,
-        website: form.website,
-        nicheId: form.nicheId,
-        state: form.state,
-        district: form.district,
-        city: form.district,
-        logoUrl: logoPreview,
-      });
+      const formData = new FormData();
+      formData.append("email", form.email);
+      formData.append("password", form.password);
+      formData.append("accountType", "brand");
+      formData.append("fullName", form.full_name);
+      formData.append("companyName", form.company_name);
+      formData.append("phone", form.phone);
+      formData.append("website", form.website);
+      formData.append("nicheId", form.nicheId);
+      formData.append("state", form.state);
+      formData.append("district", form.district);
+      formData.append("city", form.district);
+      
+      if (fileRef.current?.files?.[0]) {
+        formData.append("file", fileRef.current.files[0]);
+      }
+      formData.append("otp", form.otp);
+
+      await auth.signup(formData);
       await refreshUser();
       toast.success("Account created. Welcome to Influbrand!");
       navigate("/dashboard");
@@ -166,6 +190,53 @@ export default function SignupBrand() {
           )}
 
           {step === 2 && (
+            <form className="mt-8 space-y-5" onSubmit={(e) => { e.preventDefault(); if (form.otp.length === 6) setStep(3); else toast.error("Enter 6-digit code"); }}>
+              <div className="flex flex-col items-center rounded-xl border border-border bg-muted/30 p-6 text-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[image:var(--gradient-mint)] text-primary-foreground">
+                  <ShieldCheck className="size-6" />
+                </span>
+                <p className="mt-3 font-display text-lg font-semibold">Verify your email</p>
+                <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+                  {otpSent
+                    ? `Enter the 6-digit code we sent to ${form.email}.`
+                    : `We'll send a 6-digit verification code to ${form.email || "your email"}.`}
+                </p>
+
+                <div className="mt-6 w-full max-w-[200px]">
+                  <Input
+                    type="text"
+                    maxLength={6}
+                    className="text-center text-2xl tracking-widest"
+                    placeholder="000000"
+                    value={form.otp}
+                    onChange={(e) => set("otp", e.target.value.replace(/\D/g, ""))}
+                  />
+                </div>
+
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={sendOtp}
+                    disabled={sendingOtp}
+                    className="text-sm font-medium text-primary hover:underline disabled:opacity-50"
+                  >
+                    {sendingOtp ? "Sending..." : otpSent ? "Resend code" : "Send code"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button type="button" variant="outline" size="lg" onClick={() => setStep(1)}>
+                  <ArrowLeft className="size-4" /> Back
+                </Button>
+                <Button variant="hero" size="lg" className="flex-1" type="submit">
+                  Continue <ArrowRight className="size-4" />
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {step === 3 && (
             <form className="mt-8 grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
               <div className="flex flex-col items-center gap-3 sm:col-span-2">
                 <button
@@ -210,7 +281,7 @@ export default function SignupBrand() {
               />
 
               <div className="flex gap-3 sm:col-span-2">
-                <Button type="button" variant="outline" size="lg" onClick={() => setStep(1)}>
+                <Button type="button" variant="outline" size="lg" onClick={() => setStep(2)}>
                   <ArrowLeft className="size-4" /> Back
                 </Button>
                 <Button variant="hero" size="lg" className="flex-1" type="submit" disabled={busy}>

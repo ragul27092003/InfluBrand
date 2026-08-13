@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import { toast } from "sonner";
 import {
   Instagram,
@@ -13,6 +13,7 @@ import {
   Users,
   Link2,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,11 +26,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StepProgress } from "@/components/site/StepProgress";
-import { campaigns as campaignsApi } from "@/lib/api";
+import { campaigns as campaignsApi, influencers as influencersApi } from "@/lib/api";
 import { useCatalog } from "@/hooks/useCatalog";
 import { useStates, useDistricts } from "@/hooks/useDistricts";
 
-const STEPS = ["Campaign", "Influencers", "Brand URLs"];
+const STEPS = ["Campaign", "Influencers", "Discover Creators", "Brand URLs"];
 
 const GOAL_OPTIONS = [
   "Brand Activation",
@@ -99,6 +100,7 @@ const EMPTY_FORM = {
   instagramUrl: "",
   youtubeUrl: "",
   facebookUrl: "",
+  invitedInfluencers: [],
 };
 
 function SectionCard({ icon: Icon, title, required, children }) {
@@ -265,6 +267,8 @@ export default function CreateCampaign() {
   const [busy, setBusy] = useState(false);
   const [createdId, setCreatedId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [matchingInfluencers, setMatchingInfluencers] = useState([]);
+  const [loadingMatches, setLoadingMatches] = useState(false);
 
   function set(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -302,6 +306,21 @@ export default function CreateCampaign() {
     e.preventDefault();
     if (step === 1 && !validateStep1()) return;
     if (step === 2 && !validateStep2()) return;
+    
+    // Load matching influencers when entering step 3
+    if (step === 2) {
+      setLoadingMatches(true);
+      influencersApi.list({ 
+        niche: form.nicheId || undefined, 
+        state: form.promotionAllIndia ? undefined : form.promotionState,
+        district: form.promotionAllIndia || !form.promotionDistricts?.length ? undefined : form.promotionDistricts.join(","),
+        limit: 12
+      })
+      .then(res => setMatchingInfluencers(res.data || []))
+      .catch(() => setMatchingInfluencers([]))
+      .finally(() => setLoadingMatches(false));
+    }
+    
     setStep((s) => s + 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -315,44 +334,54 @@ export default function CreateCampaign() {
     e.preventDefault();
     setBusy(true);
     try {
-      let briefFileUrl = null;
+      const promotionCities = form.promotionAllIndia ? ["All Over India"] : form.promotionDistricts;
+      const formData = new FormData();
+      formData.append("title", `${form.brandName} Promotion`);
+      formData.append("brief", form.taskDetails);
+      if (form.nicheId) formData.append("nicheId", form.nicheId);
+      if (!form.promotionAllIndia && form.promotionState) formData.append("state", form.promotionState);
+      formData.append("promotionType", form.promotionType);
+      
+      promotionCities.forEach(c => formData.append("promotionCities", c));
+      formData.append("brandName", form.brandName);
+      formData.append("brandOverview", form.brandOverview);
+      formData.append("brandWebsite", form.brandWebsite);
+      form.goals.forEach(g => formData.append("goals", g));
+      form.contentFormats.forEach(c => formData.append("contentFormats", c));
+      formData.append("taskDetails", form.taskDetails);
+      if (form.briefFile) formData.append("briefFileName", form.briefFile.name);
+      formData.append("influencerCount", form.influencerCount);
+      formData.append("payPerInfluencer", form.payPerInfluencer);
+      formData.append("expectedStart", form.expectedStart);
+      if (form.instagramUrl) formData.append("instagramUrl", form.instagramUrl);
+      if (form.youtubeUrl) formData.append("youtubeUrl", form.youtubeUrl);
+      if (form.facebookUrl) formData.append("facebookUrl", form.facebookUrl);
+      formData.append("status", "pending");
+      
+      if (form.invitedInfluencers && form.invitedInfluencers.length > 0) {
+        form.invitedInfluencers.forEach(id => formData.append("invitedInfluencerIds", id));
+      }
+      
       if (form.briefFile) {
         if (form.briefFile.size > 5 * 1024 * 1024) {
           toast.error("Campaign brief must be under 5 MB.");
           setBusy(false);
           return;
         }
-        briefFileUrl = await readAsDataUrl(form.briefFile);
+        formData.append("file", form.briefFile);
       }
-      const promotionCities = form.promotionAllIndia ? ["All Over India"] : form.promotionDistricts;
-      const payload = {
-        title: `${form.brandName} Promotion`,
-        brief: form.taskDetails,
-        nicheId: form.nicheId || undefined,
-        state: form.promotionAllIndia ? null : form.promotionState,
-        promotionType: form.promotionType,
-        promotionCities,
-        brandName: form.brandName,
-        brandOverview: form.brandOverview,
-        brandWebsite: form.brandWebsite,
-        goals: form.goals,
-        contentFormats: form.contentFormats,
-        taskDetails: form.taskDetails,
-        briefFileName: form.briefFile?.name || null,
-        briefFileUrl,
-        influencerCount: form.influencerCount,
-        payPerInfluencer: form.payPerInfluencer,
-        expectedStart: form.expectedStart,
-        instagramUrl: form.instagramUrl,
-        youtubeUrl: form.youtubeUrl,
-        facebookUrl: form.facebookUrl,
-        status: "pending",
-      };
-      const created = await campaignsApi.create(payload);
+
+      const created = await campaignsApi.create(formData);
       setCreatedId(created._id);
       toast.success("Campaign added successfully");
-      setStep(4);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      
+      if (form.invitedInfluencers && form.invitedInfluencers.length > 0) {
+        // Skip packages for private invites
+        navigate("/dashboard/campaigns");
+      } else {
+        setStep(5);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     } catch (err) {
       toast.error(err.message || "Something went wrong.");
     } finally {
@@ -383,7 +412,7 @@ export default function CreateCampaign() {
           style={{ background: "var(--gradient-mint)", opacity: 0.12, clipPath: "polygon(30% 0, 100% 0, 100% 100%, 0 100%)" }}
         />
         <div className="relative px-6 py-8 text-center sm:px-10">
-          {step < 4 ? (
+          {step < 5 ? (
             <>
               <p className="flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-white/45">
                 <span className="h-px w-6" style={{ background: "var(--gradient-gold)" }} />
@@ -411,10 +440,19 @@ export default function CreateCampaign() {
         <div className="h-px w-full" style={{ background: "var(--gradient-gold)", opacity: 0.7 }} />
       </div>
 
-      <div className="surface-panel overflow-hidden">
+      <div className="surface-panel overflow-hidden relative min-h-[400px]">
+        <AnimatePresence mode="wait">
         {/* STEP 1 — Campaign Details */}
         {step === 1 && (
-          <form onSubmit={goNext} className="space-y-5 p-6 sm:p-8">
+          <motion.form 
+            key="step1"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            onSubmit={goNext} 
+            className="space-y-5 p-6 sm:p-8"
+          >
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-bold">Tell us about your brand</h2>
               <span className="text-xs text-muted-foreground">*Required</span>
@@ -491,12 +529,20 @@ export default function CreateCampaign() {
             <Button type="submit" variant="hero" size="lg" className="w-full">
               Continue to influencer details
             </Button>
-          </form>
+          </motion.form>
         )}
 
         {/* STEP 2 — Influencer Details */}
         {step === 2 && (
-          <form onSubmit={goNext} className="space-y-5 p-6 sm:p-8">
+          <motion.form 
+            key="step2"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            onSubmit={goNext} 
+            className="space-y-5 p-6 sm:p-8"
+          >
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-bold">Who do you need?</h2>
               <span className="text-xs text-muted-foreground">*Required</span>
@@ -530,15 +576,105 @@ export default function CreateCampaign() {
                 Back
               </Button>
               <Button type="submit" variant="hero" className="flex-1">
+                Continue to discover creators
+              </Button>
+            </div>
+          </motion.form>
+        )}
+
+        {/* STEP 3 — Discover Creators */}
+        {step === 3 && (
+          <motion.form 
+            key="step3"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            onSubmit={goNext} 
+            className="space-y-5 p-6 sm:p-8"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-lg font-bold">Invite specific creators</h2>
+              <span className="text-xs text-muted-foreground">Optional</span>
+            </div>
+            
+            <p className="text-sm text-muted-foreground">
+              Based on your location and category, we found these creators. Select any you'd like to invite directly. If you select creators, this campaign will be sent <b>only</b> to them (Private). If you skip this, it will be broadcasted to all matching creators.
+            </p>
+
+            {loadingMatches ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">Finding matching creators...</div>
+            ) : matchingInfluencers.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                No exact matches found for your criteria. You can still proceed to broadcast this campaign.
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {matchingInfluencers.map(inf => {
+                  const isSelected = form.invitedInfluencers.includes(inf._id || inf.id);
+                  return (
+                    <div 
+                      key={inf._id || inf.id} 
+                      onClick={() => {
+                        const id = inf._id || inf.id;
+                        set("invitedInfluencers", isSelected 
+                          ? form.invitedInfluencers.filter(x => x !== id) 
+                          : [...form.invitedInfluencers, id]
+                        );
+                      }}
+                      className={`cursor-pointer rounded-xl border p-4 transition-all ${isSelected ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <img src={inf.avatarUrl || `https://ui-avatars.com/api/?name=${inf.name}`} className="size-10 rounded-full object-cover" alt="" />
+                        <div>
+                          <p className="font-medium line-clamp-1">{inf.name}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-1">{inf.city}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="text-xs font-medium">{inf.followers?.toLocaleString()} followers</span>
+                        <div className="flex items-center gap-3">
+                          <Link
+                            to={`/influencers/${inf._id || inf.id}`}
+                            target="_blank"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-xs font-semibold text-primary hover:underline"
+                          >
+                            View Profile
+                          </Link>
+                          <div className={`flex size-5 items-center justify-center rounded-full border ${isSelected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30"}`}>
+                            {isSelected && <CheckCircle2 className="size-3.5" />}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-4">
+              <Button type="button" variant="outline" className="flex-1" onClick={goBack}>
+                Back
+              </Button>
+              <Button type="submit" variant="hero" className="flex-1">
                 Continue to brand URLs
               </Button>
             </div>
-          </form>
+          </motion.form>
         )}
 
-        {/* STEP 3 — Brand URLs */}
-        {step === 3 && (
-          <form onSubmit={handleComplete} className="space-y-5 p-6 sm:p-8">
+        {/* STEP 4 — Brand URLs */}
+        {step === 4 && (
+          <motion.form 
+            key="step4"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            onSubmit={handleComplete} 
+            className="space-y-5 p-6 sm:p-8"
+          >
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-bold">Link your brand's social presence</h2>
               <span className="text-xs text-muted-foreground">Optional but recommended</span>
@@ -569,12 +705,19 @@ export default function CreateCampaign() {
                 {busy ? "Saving…" : "Submit campaign"}
               </Button>
             </div>
-          </form>
+          </motion.form>
         )}
 
-        {/* STEP 4 — Package selection */}
-        {step === 4 && (
-          <div className="space-y-6 p-6 sm:p-8">
+        {/* STEP 5 — Package selection */}
+        {step === 5 && (
+          <motion.div 
+            key="step5"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="space-y-6 p-6 sm:p-8"
+          >
             <div className="grid gap-5 sm:grid-cols-3">
               {PACKAGES.map((pkg) => (
                 <div
@@ -613,8 +756,9 @@ export default function CreateCampaign() {
             <p className="text-center text-xs text-muted-foreground">
               We do not promote services related to online betting, forex trading, or crypto buy/sell.
             </p>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
     </div>
   );

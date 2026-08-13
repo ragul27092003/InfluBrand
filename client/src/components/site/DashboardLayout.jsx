@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/site/Logo";
 import { useAuth } from "@/lib/AuthContext";
 import { brands, influencers } from "@/lib/api";
+import { calculateInfluBrandScore } from "@/lib/catalog";
+import { ThemeToggle } from "./ThemeToggle";
 
 const PURCHASE_LINKS = [
   { to: "/dashboard/purchases/buy-connects", label: "Buy Connects" },
@@ -25,8 +27,9 @@ const PURCHASE_LINKS = [
 
 const BRAND_NAV = [
   { to: "/dashboard", end: true, label: "Dashboard" },
-  { to: "/influencers", label: "Influencers" },
+  { to: "/dashboard/influencers", label: "Influencers" },
   { to: "/dashboard/campaigns", label: "My Campaigns" },
+  { to: "/dashboard/messages", label: "Inbox" },
   { to: "/dashboard/profile", label: "My Profile" },
   { to: "/dashboard/purchases", label: "My Purchase" },
 ];
@@ -34,21 +37,29 @@ const BRAND_NAV = [
 const INFLUENCER_NAV = [
   { to: "/dashboard/campaigns", label: "Campaigns" },
   { to: "/dashboard/offers", label: "Direct Offers" },
+  { to: "/dashboard/messages", label: "Inbox" },
+  { to: "/dashboard/public-profile", label: "Public Profile" },
   { to: "/dashboard/interests", label: "Profile Interests" },
   { to: "/dashboard/unlocks", label: "URL Unlocks" },
-  { to: "/dashboard/profile", label: "My Profile" },
+  { to: "/dashboard/profile", label: "Edit Profile" },
   { to: "/dashboard/earnings", label: "My Earnings" },
   { to: "/dashboard/others", label: "Others" },
 ];
 
-const ADMIN_NAV = [{ to: "/dashboard/admin/catalog", end: true, label: "Manage Catalog" }];
+const ADMIN_NAV = [
+  { to: "/dashboard/admin/overview", label: "Overview" },
+  { to: "/dashboard/admin/users", label: "User Management" },
+  { to: "/dashboard/admin/catalog", label: "Manage Catalog" },
+  { to: "/dashboard/admin/verification", label: "Verify Influencers" }
+];
 
 export function DashboardLayout() {
-  const { user, accountType, loading, logout } = useAuth();
+  const { user, accountType, loading, logout, isImpersonating, stopImpersonating } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [connectBalance, setConnectBalance] = useState(null);
+  const [influencerStats, setInfluencerStats] = useState({ score: 0, balance: 0 });
   const [profileOpen, setProfileOpen] = useState(false);
   const [isVerified, setIsVerified] = useState(null);
   const profileRef = useRef(null);
@@ -65,7 +76,13 @@ export function DashboardLayout() {
     if (accountType === "influencer") {
       influencers
         .me()
-        .then((i) => setIsVerified(i.is_verified))
+        .then((i) => {
+          setIsVerified(i.isVerified ?? i.is_verified);
+          setInfluencerStats({
+            score: calculateInfluBrandScore(i),
+            balance: i.account_balance || i.accountBalance || 0
+          });
+        })
         .catch(() => setIsVerified(null));
     }
   }, [accountType]);
@@ -87,7 +104,7 @@ export function DashboardLayout() {
     // Admins have no brand/influencer dashboard content — send them
     // straight to the page they actually need.
     if (!loading && user && accountType === "admin" && window.location.pathname === "/dashboard") {
-      navigate("/dashboard/admin/catalog", { replace: true });
+      navigate("/dashboard/admin/overview", { replace: true });
     }
   }, [user, accountType, loading, navigate]);
 
@@ -117,12 +134,26 @@ export function DashboardLayout() {
     : isBrand
     ? [{ value: String(connectBalance ?? 0).padStart(2, "0"), label: "Connect balance" }]
     : [
-        { value: "0.0", label: "InfluBrand score" },
-        { value: "$0", label: "Account balance" },
+        { value: Number(influencerStats.score).toFixed(1), label: "InfluBrand score" },
+        { value: `₹${influencerStats.balance}`, label: "Account balance" },
       ];
 
   return (
-    <div className="dash-light flex min-h-[calc(100vh-4rem)] flex-col bg-background text-foreground">
+    <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-background text-foreground">
+      {isImpersonating && (
+        <div className="bg-destructive text-destructive-foreground px-4 py-2 text-center text-sm font-semibold flex items-center justify-center gap-4">
+          <span>You are currently impersonating {displayName}.</span>
+          <button 
+            onClick={() => {
+              stopImpersonating();
+              navigate("/dashboard/admin/users");
+            }} 
+            className="underline hover:text-white transition-colors"
+          >
+            Return to Admin
+          </button>
+        </div>
+      )}
       {/* Identity row — clean, quiet, JPMorgan-style restraint */}
       <div className="relative z-30 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
@@ -195,6 +226,7 @@ export function DashboardLayout() {
             >
               {mobileOpen ? <X className="size-4" /> : <Menu className="size-4" />}
             </button>
+            <ThemeToggle />
           </div>
         </div>
       </div>

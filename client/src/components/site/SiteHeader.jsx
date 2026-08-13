@@ -4,8 +4,14 @@ import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "./Logo";
 import { useAuth } from "@/lib/AuthContext";
+import { ThemeToggle } from "./ThemeToggle";
 
-const NAV = [];
+const NAV = [
+  { to: "/", label: "Home" },
+  { to: "/influencers", label: "Find Influencers" },
+  { to: "/for-brands", label: "For Brands" },
+  { to: "/contact", label: "Contact" },
+];
 
 export function SiteHeader() {
   const { user, loading, logout } = useAuth();
@@ -24,7 +30,7 @@ export function SiteHeader() {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-1 md:flex">
-          {NAV.map((item) => (
+          {!user && NAV.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -63,6 +69,7 @@ export function SiteHeader() {
               </Button>
             </>
           )}
+          <ThemeToggle />
         </div>
 
         {/* Mobile menu toggle */}
@@ -79,7 +86,7 @@ export function SiteHeader() {
       {open && (
         <div className="border-t border-border/60 bg-background md:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-4">
-            {NAV.map((item) => (
+            {!user && NAV.map((item) => (
               <Link
                 key={item.to}
                 to={item.to}
@@ -109,6 +116,9 @@ export function SiteHeader() {
                   </Button>
                 </>
               )}
+              <div className="flex items-center justify-center pt-2">
+                <ThemeToggle />
+              </div>
             </div>
           </div>
         </div>

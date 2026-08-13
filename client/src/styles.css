@@ -138,13 +138,21 @@
 .dark {
   --background: oklch(0.19 0.031 245);
   --foreground: oklch(0.97 0.012 160);
-}
 
-/* Dashboard content uses the same bright surface as the rest of the site now;
-   kept as a harmless alias so DashboardLayout's scoping class still works. */
-.dash-light {
-  --background: oklch(0.99 0.004 240);
-  --foreground: oklch(0.22 0.03 240);
+  --surface: oklch(0.21 0.03 248);
+  --surface-foreground: oklch(0.97 0.012 160);
+
+  --card: oklch(0.21 0.03 248);
+  --card-foreground: oklch(0.97 0.012 160);
+
+  --popover: oklch(0.21 0.03 248);
+  --popover-foreground: oklch(0.97 0.012 160);
+
+  --muted: oklch(0.26 0.02 245);
+  --muted-foreground: oklch(0.7 0.02 240);
+
+  --border: oklch(0.28 0.02 240);
+  --input: oklch(0.28 0.02 240);
 }
 
 @layer base {

@@ -4,6 +4,8 @@ import "dotenv/config";
 import mongoose from "mongoose";
 import { Platform } from "../models/Platform.js";
 import { Niche } from "../models/Niche.js";
+import { Influencer } from "../models/Influencer.js";
+import { INFLUENCER_DATA } from "./influencer-data.js";
 
 const PLATFORMS = [
   { name: "Instagram", icon: "instagram" },
@@ -62,6 +64,47 @@ async function seed() {
     );
   }
   console.log(`[seed] upserted ${NICHES.length} niches`);
+
+  // Seed Influencers
+  console.log(`[seed] clearing existing influencers...`);
+  await Influencer.deleteMany({ source: "seed" });
+
+  const platformCache = new Map();
+  const nicheCache = new Map();
+
+  const allPlatforms = await Platform.find({});
+  allPlatforms.forEach((p) => platformCache.set(p.name, p._id));
+
+  const allNiches = await Niche.find({});
+  allNiches.forEach((n) => nicheCache.set(n.name, n._id));
+
+  let influencerCount = 0;
+  for (const infData of INFLUENCER_DATA) {
+    const platformIds = infData.platforms
+      .map((p) => platformCache.get(p))
+      .filter(Boolean);
+    const nicheIds = infData.niches
+      .map((n) => nicheCache.get(n))
+      .filter(Boolean);
+
+    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      infData.name
+    )}&background=random&size=200`;
+
+    await Influencer.findOneAndUpdate(
+      { handle: infData.handle },
+      {
+        ...infData,
+        platforms: platformIds,
+        niches: nicheIds,
+        avatarUrl,
+        source: "seed",
+      },
+      { upsert: true, new: true }
+    );
+    influencerCount++;
+  }
+  console.log(`[seed] upserted ${influencerCount} influencers`);
 
   await mongoose.disconnect();
   console.log("[seed] done");

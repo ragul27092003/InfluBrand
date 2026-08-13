@@ -1,11 +1,25 @@
 import { Router } from "express";
-import { signup, login, me } from "../controllers/auth.controller.js";
+import {
+  sendOtp,
+  signup,
+  login,
+  me,
+  deleteMe,
+  updateSettings,
+  exportData
+} from "../controllers/auth.controller.js";
 import { requireAuth } from "../middleware/auth.js";
+import { loginLimiter, otpLimiter } from "../middleware/rateLimit.js";
+import { upload } from "../middleware/upload.js";
 
 const router = Router();
 
-router.post("/signup", signup);
-router.post("/login", login);
+router.post("/send-otp", otpLimiter, sendOtp);
+router.post("/signup", upload.single("file"), signup);
+router.post("/login", loginLimiter, login);
 router.get("/me", requireAuth, me);
+router.delete("/me", requireAuth, deleteMe);
+router.patch("/me/settings", requireAuth, updateSettings);
+router.get("/me/export", requireAuth, exportData);
 
 export default router;

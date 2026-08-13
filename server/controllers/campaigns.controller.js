@@ -76,7 +76,23 @@ const WIZARD_FIELDS = [
 
 // GET /api/campaigns/browse — public feed of open campaigns for influencers to apply to
 export const browseCampaigns = asyncHandler(async (req, res) => {
-  const campaigns = await Campaign.find({ status: { $in: ["active", "pending"] } })
+  const query = { status: { $in: ["active", "pending"] }, type: { $ne: "invite_only" } };
+
+  if (req.user.accountType === "influencer") {
+    const { Influencer } = await import("../models/Influencer.js");
+    const influencer = await Influencer.findOne({ userId: req.user._id });
+    if (influencer) {
+      if (influencer.niches && influencer.niches.length > 0) {
+        query.nicheId = { $in: influencer.niches };
+      }
+      const locMatches = ["All Over India"];
+      if (influencer.city) locMatches.push(influencer.city);
+      if (influencer.district) locMatches.push(influencer.district);
+      query.promotionCities = { $in: locMatches };
+    }
+  }
+
+  const campaigns = await Campaign.find(query)
     .sort({ createdAt: -1 })
     .limit(100)
     .populate([...POPULATE, { path: "brandId", select: "companyName city logoUrl" }]);
@@ -93,7 +109,22 @@ export const listMyCampaigns = asyncHandler(async (req, res) => {
   const brandId = await myBrandId(req.user._id);
   if (!brandId) return res.json([]);
   const campaigns = await Campaign.find({ brandId }).sort({ createdAt: -1 }).populate(POPULATE);
-  res.json(campaigns.map(toClientShape));
+  
+  const campaignIds = campaigns.map(c => c._id);
+  const applicantCounts = await Shortlist.aggregate([
+    { $match: { campaignId: { $in: campaignIds }, brandId } },
+    { $group: { _id: "$campaignId", count: { $sum: 1 } } }
+  ]);
+
+  const countMap = {};
+  applicantCounts.forEach(ac => {
+    countMap[ac._id.toString()] = ac.count;
+  });
+
+  res.json(campaigns.map(c => ({
+    ...toClientShape(c),
+    applicantCount: countMap[c._id.toString()] || 0
+  })));
 });
 
 // POST /api/campaigns
@@ -113,6 +144,21 @@ export const createCampaign = asyncHandler(async (req, res) => {
     if (key in req.body) wizardData[key] = req.body[key];
   }
 
+  const fileUrl = req.file ? `/uploads/${req.file.filename}` : null;
+  if (fileUrl) wizardData.briefFileUrl = fileUrl;
+
+  let campaignType = req.body.type || "self_managed";
+  let invitedInfluencers = [];
+  
+  if (req.body.invitedInfluencerIds) {
+    campaignType = "invite_only";
+    if (Array.isArray(req.body.invitedInfluencerIds)) {
+      invitedInfluencers = req.body.invitedInfluencerIds;
+    } else {
+      invitedInfluencers = req.body.invitedInfluencerIds.split(",").map(i => i.trim()).filter(Boolean);
+    }
+  }
+
   const campaign = await Campaign.create({
     brandId,
     title,
@@ -126,8 +172,21 @@ export const createCampaign = asyncHandler(async (req, res) => {
     startsOn,
     endsOn,
     status: status || "pending",
+    type: campaignType,
     ...wizardData,
   });
+
+  if (campaignType === "invite_only" && invitedInfluencers.length > 0) {
+    const invites = invitedInfluencers.map(id => ({
+      brandId,
+      influencerId: id,
+      campaignId: campaign._id,
+      kind: "offer",
+      note: "You've been invited to apply to this private campaign.",
+    }));
+    await Shortlist.insertMany(invites);
+  }
+
   await campaign.populate(POPULATE);
   res.status(201).json(toClientShape(campaign));
 });
@@ -167,6 +226,17 @@ export const updateCampaign = asyncHandler(async (req, res) => {
   res.json(toClientShape(campaign));
 });
 
+// GET /api/campaigns/:id
+export const getCampaign = asyncHandler(async (req, res) => {
+  const brandId = await myBrandId(req.user._id);
+  if (!brandId) return res.status(404).json({ error: "No brand profile for this account" });
+
+  const campaign = await Campaign.findOne({ _id: req.params.id, brandId });
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+
+  res.json(toClientShape(campaign));
+});
+
 // GET /api/campaigns/:id/applicants — influencers who applied/were matched to this campaign
 export const listCampaignApplicants = asyncHandler(async (req, res) => {
   const brandId = await myBrandId(req.user._id);
@@ -176,10 +246,28 @@ export const listCampaignApplicants = asyncHandler(async (req, res) => {
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
 
   const applicants = await Shortlist.find({ campaignId: campaign._id, brandId })
-    .populate("influencerId", "name city platformId handle avatarUrl phone email")
+    .populate({
+      path: "influencerId",
+      select: "name city platformId handle avatarUrl",
+      populate: { path: "userId", select: "email phone" }
+    })
     .sort({ createdAt: -1 });
 
-  res.json(applicants);
+  const safeApplicants = applicants.map(a => {
+    const doc = a.toObject();
+    if (doc.influencerId && doc.influencerId.userId) {
+      doc.influencerId.email = doc.influencerId.userId.email;
+      doc.influencerId.phone = doc.influencerId.userId.phone;
+      delete doc.influencerId.userId;
+    }
+    if (!doc.isUnlocked && doc.influencerId) {
+      delete doc.influencerId.email;
+      delete doc.influencerId.phone;
+    }
+    return doc;
+  });
+
+  res.json(safeApplicants);
 });
 
 // DELETE /api/campaigns/:id

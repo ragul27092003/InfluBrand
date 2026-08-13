@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, SlidersHorizontal, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InfluencerCard } from "@/components/site/InfluencerCard";
@@ -11,86 +11,144 @@ import { formatCount, formatRupees, derivedRating } from "@/lib/catalog";
 import { useCatalog } from "@/hooks/useCatalog";
 import { useStates } from "@/hooks/useDistricts";
 import { useAuth } from "@/lib/AuthContext";
-import { Reveal, RevealGroup, RevealItem } from "@/components/motion/Reveal";
 
 const MAX_FOLLOWERS = 1000000;
 const MAX_PRICE = 100000;
 
-function FilterGroup({ title, options, active, onSelect }) {
+function FilterGroup({ title, options, active, onSelect, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen || active !== "All");
+
   return (
-    <div className="surface-panel surface-panel-hover p-5">
-      <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h3>
-      <ul className="max-h-72 space-y-1 overflow-y-auto pr-1">
-        {options.map((option) => (
-          <li key={option.value}>
-            <button
-              onClick={() => onSelect(option.value)}
-              className={`w-full rounded-lg px-3 py-1.5 text-left text-sm transition-colors ${
-                active === option.value
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              }`}
-            >
-              {option.label}
-            </button>
-          </li>
-        ))}
-      </ul>
+    <div className="surface-panel surface-panel-hover overflow-hidden rounded-xl">
+      <button 
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between p-5 text-left"
+      >
+        <h3 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </h3>
+        {open ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <ul className="max-h-72 space-y-1 overflow-y-auto px-5 pb-5 pr-1 custom-scrollbar">
+              {options.map((option) => (
+                <li key={option.value}>
+                  <button
+                    onClick={() => onSelect(option.value)}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-all ${
+                      active === option.value
+                        ? "bg-primary/10 text-primary font-semibold shadow-sm"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    }`}
+                  >
+                    {option.label}
+                    {active === option.value && <div className="size-1.5 rounded-full bg-primary" />}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 function RangeSlider({ title, value, max, onChange, format }) {
+  const [open, setOpen] = useState(true);
+
   return (
-    <div className="surface-panel surface-panel-hover p-5">
-      <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h3>
-      <input
-        type="range"
-        min={0}
-        max={max}
-        step={max / 100}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-primary"
-      />
-      <p className="mt-2 text-sm text-muted-foreground">
-        Up to <span className="text-foreground">{format(value)}</span>
-      </p>
+    <div className="surface-panel surface-panel-hover overflow-hidden rounded-xl">
+      <button 
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between p-5 text-left"
+      >
+        <h3 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </h3>
+        {open ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="px-5 pb-5 overflow-hidden"
+          >
+            <input
+              type="range"
+              min={0}
+              max={max}
+              step={max / 100}
+              value={value}
+              onChange={(e) => onChange(Number(e.target.value))}
+              className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">0</span>
+              <p className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                Up to {format(value)}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 function PlatformFilter({ platforms, selected, onToggle }) {
+  const [open, setOpen] = useState(true);
+
   return (
-    <div className="surface-panel surface-panel-hover p-5">
-      <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Platform
-      </h3>
-      <div className="space-y-2">
-        {platforms.map((p) => {
-          const id = p._id || p.id;
-          return (
-            <label key={id} className="flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={selected.includes(id)}
-                onChange={() => onToggle(id)}
-                className="h-4 w-4 rounded border-border accent-primary"
-              />
-              {p.name}
-            </label>
-          );
-        })}
-      </div>
+    <div className="surface-panel surface-panel-hover overflow-hidden rounded-xl">
+      <button 
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between p-5 text-left"
+      >
+        <h3 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Platform
+        </h3>
+        {open ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="px-5 pb-5 overflow-hidden"
+          >
+            <div className="space-y-2">
+              {platforms.map((p) => {
+                const id = p._id || p.id;
+                const isSelected = selected.includes(id);
+                return (
+                  <label key={id} className={`flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-muted/50"}`}>
+                    <div className={`flex h-5 w-5 items-center justify-center rounded border transition-colors ${isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"}`}>
+                      {isSelected && <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                    </div>
+                    <span className={`text-sm ${isSelected ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{p.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-export default function Influencers() {
+export default function Influencers({ isDashboard = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, accountType } = useAuth();
   const { platforms, niches } = useCatalog();
@@ -108,40 +166,49 @@ export default function Influencers() {
   const stateFilter = searchParams.get("state") || "All";
   const query = searchParams.get("q") || "";
 
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [myLists, setMyLists] = useState([]);
+
   useEffect(() => {
+    if (accountType === "brand") {
+      shortlists.list().then(setMyLists).catch(console.error);
+    }
+  }, [accountType]);
+
+  useEffect(() => {
+    setLoading(true);
     influencersApi
-      .list()
-      .then((data) => setInfluencers(data))
+      .list({
+        page,
+        limit: 20,
+        q: query,
+        niche: nicheFilter,
+        state: stateFilter,
+        platform: platformIds.join(","),
+        maxFollowers,
+        maxPrice,
+        sort,
+      })
+      .then((res) => {
+        setInfluencers(res.data);
+        setTotalPages(res.totalPages);
+      })
       .catch(() => setInfluencers([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [page, query, nicheFilter, stateFilter, platformIds, maxFollowers, maxPrice, sort]);
 
   function togglePlatform(id) {
     setPlatformIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setPage(1); // Reset page on filter change
   }
 
-  const results = useMemo(() => {
-    const filtered = influencers.filter((inf) => {
-      const infNicheIds = (inf.niches || []).map((n) => n._id || n);
-      const matchNiche = nicheFilter === "All" || infNicheIds.includes(nicheFilter);
-      const matchState = stateFilter === "All" || inf.state === stateFilter;
-      const matchQuery =
-        !query ||
-        inf.name.toLowerCase().includes(query.toLowerCase()) ||
-        (inf.handle ?? "").toLowerCase().includes(query.toLowerCase());
-      const infPlatformId = inf.platform?._id || inf.platform;
-      const matchPlatform = platformIds.length === 0 || platformIds.includes(infPlatformId);
-      const matchFollowers = (inf.followers || 0) <= maxFollowers;
-      const matchPrice = !inf.starting_price || inf.starting_price <= maxPrice;
-      return matchNiche && matchState && matchQuery && matchPlatform && matchFollowers && matchPrice;
-    });
-    return [...filtered].sort((a, b) => {
-      if (sort === "engagement") return b.engagement - a.engagement;
-      if (sort === "rating") return derivedRating(b) - derivedRating(a);
-      if (sort === "newest") return a.name.localeCompare(b.name);
-      return b.followers - a.followers;
-    });
-  }, [influencers, nicheFilter, stateFilter, query, sort, platformIds, maxFollowers, maxPrice]);
+  // Update page reset for other filters
+  useEffect(() => {
+    setPage(1);
+  }, [query, nicheFilter, stateFilter, maxFollowers, maxPrice, sort]);
+
+  const results = influencers;
 
   function setFilter(patch) {
     setSearchParams((prev) => {
@@ -165,7 +232,13 @@ export default function Influencers() {
     }
     setBusyId(influencer.id || influencer._id);
     try {
-      await shortlists.create({ influencerId: influencer.id || influencer._id, kind });
+      const newList = await shortlists.create({ influencerId: influencer.id || influencer._id, kind });
+      setMyLists((prev) => {
+        const filtered = prev.filter(
+          (s) => (s.influencerId?._id || s.influencerId) !== (influencer.id || influencer._id)
+        );
+        return [...filtered, newList];
+      });
       toast.success(
         kind === "offer"
           ? `Offer sent to ${influencer.name}.`
@@ -186,10 +259,11 @@ export default function Influencers() {
   const stateOptions = [{ value: "All", label: "All" }, ...states.map((s) => ({ value: s.code, label: s.name }))];
 
   return (
-    <>
-      <section className="relative overflow-hidden border-b border-border/60">
-        <div className="hero-glow absolute inset-0" />
-        <div className="relative mx-auto w-full max-w-7xl px-4 py-14 sm:px-6">
+    <div className={isDashboard ? "px-6" : ""}>
+      {!isDashboard && (
+        <section className="relative overflow-hidden border-b border-border/60">
+          <div className="hero-glow absolute inset-0" />
+          <div className="relative mx-auto w-full max-w-7xl px-4 py-14 sm:px-6">
           <motion.span
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -239,8 +313,9 @@ export default function Influencers() {
           </motion.div>
         </div>
       </section>
+      )}
 
-      <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[260px_1fr]">
+      <div className={isDashboard ? "grid w-full gap-8 py-8 lg:grid-cols-[260px_1fr]" : "mx-auto grid w-full max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[260px_1fr]"}>
         <motion.aside
           initial={{ opacity: 0, x: -24 }}
           whileInView={{ opacity: 1, x: 0 }}
@@ -294,15 +369,15 @@ export default function Influencers() {
               )}
             </p>
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Sort by:</span>
+              <span className="text-muted-foreground flex items-center gap-1"><SlidersHorizontal className="size-4" /> Sort by:</span>
               {["popular", "engagement", "rating", "newest"].map((key) => (
                 <button
                   key={key}
                   onClick={() => setSort(key)}
-                  className={`rounded-full border px-3 py-1 text-xs capitalize transition-colors ${
+                  className={`rounded-full px-4 py-1.5 text-xs font-semibold capitalize transition-all ${
                     sort === key
-                      ? "border-transparent bg-foreground text-background"
-                      : "border-border text-muted-foreground hover:text-foreground"
+                      ? "bg-primary text-primary-foreground shadow-md"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   {key}
@@ -311,29 +386,107 @@ export default function Influencers() {
             </div>
           </div>
 
-          {!loading && results.length === 0 ? (
-            <div className="surface-panel p-12 text-center">
-              <p className="font-display text-lg">No creators match those filters</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Try widening the niche, state or range filters.
+          {loading ? (
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="surface-panel h-[360px] animate-pulse rounded-2xl p-5 flex flex-col items-center justify-center">
+                  <div className="size-24 rounded-full bg-muted mb-4" />
+                  <div className="h-4 w-32 bg-muted rounded mb-2" />
+                  <div className="h-3 w-20 bg-muted rounded mb-6" />
+                  <div className="w-full h-px bg-border mb-6" />
+                  <div className="flex gap-4 w-full justify-center">
+                    <div className="h-8 w-16 bg-muted rounded-md" />
+                    <div className="h-8 w-16 bg-muted rounded-md" />
+                    <div className="h-8 w-16 bg-muted rounded-md" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : results.length === 0 ? (
+            <div className="surface-panel flex flex-col items-center justify-center py-20 text-center rounded-2xl border-dashed">
+              <div className="flex size-16 items-center justify-center rounded-full bg-muted mb-4">
+                <UserX className="size-8 text-muted-foreground" />
+              </div>
+              <p className="font-display text-xl font-bold">No creators found</p>
+              <p className="mt-2 text-sm text-muted-foreground max-w-sm">
+                We couldn't find any creators matching your exact filters. Try widening the niche, state or range filters.
               </p>
+              <Button variant="outline" className="mt-6" onClick={() => {
+                setFilter({ niche: undefined, state: undefined, q: undefined });
+                setPlatformIds([]);
+                setMaxFollowers(MAX_FOLLOWERS);
+              }}>
+                Clear all filters
+              </Button>
             </div>
           ) : (
-            <RevealGroup className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3" stagger={0.06} amount={0.05}>
-              {results.map((influencer) => (
-                <RevealItem key={influencer.id || influencer._id} scale>
-                  <InfluencerCard
-                    influencer={influencer}
-                    busy={busyId === (influencer.id || influencer._id)}
-                    onShortlist={(inf) => addToList(inf, "shortlist")}
-                    onOffer={(inf) => addToList(inf, "offer")}
-                  />
-                </RevealItem>
-              ))}
-            </RevealGroup>
+            <motion.div
+              key={results.length}
+              className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
+              initial="hidden"
+              animate="show"
+              variants={{
+                hidden: {},
+                show: { transition: { staggerChildren: 0.06 } },
+              }}
+            >
+              {results.map((influencer) => {
+                const listStatus = myLists.find(
+                  (s) => (s.influencerId?._id || s.influencerId) === (influencer.id || influencer._id)
+                );
+                const isShortlisted = listStatus?.kind === "shortlist" || listStatus?.kind === "offer";
+                const isOffered = listStatus?.kind === "offer";
+                return (
+                  <motion.div
+                    key={influencer.id || influencer._id}
+                    variants={{
+                      hidden: { opacity: 0, y: 32, scale: 0.94 },
+                      show: {
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] },
+                      },
+                    }}
+                  >
+                    <InfluencerCard
+                      influencer={influencer}
+                      busy={busyId === (influencer.id || influencer._id)}
+                      isShortlisted={isShortlisted}
+                      isOffered={isOffered}
+                      onShortlist={(inf) => addToList(inf, "shortlist")}
+                      onOffer={(inf) => addToList(inf, "offer")}
+                      isDashboard={isDashboard}
+                    />
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          )}
+
+          {!loading && totalPages > 1 && (
+            <div className="mt-12 flex items-center justify-center gap-4">
+              <Button
+                variant="outline"
+                disabled={page === 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <span className="text-sm font-medium text-muted-foreground">
+                Page {page} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
           )}
         </main>
       </div>
-    </>
+    </div>
   );
 }

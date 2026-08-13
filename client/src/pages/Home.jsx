@@ -148,7 +148,7 @@ export default function Home() {
   useEffect(() => {
     influencersApi
       .list()
-      .then((data) => setInfluencers(data))
+      .then((res) => setInfluencers(res.data || []))
       .catch(() => setInfluencers([]))
       .finally(() => setLoading(false));
   }, []);
@@ -159,7 +159,8 @@ export default function Home() {
     <>
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-border/60">
-        <div className="hero-glow absolute inset-0" />
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-background to-background pointer-events-none" />
+        <div className="hero-glow absolute inset-0 opacity-50" />
         <FloatingBlob
           className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-[image:var(--gradient-mint)] opacity-20 blur-3xl"
           duration={16}
@@ -250,22 +251,28 @@ export default function Home() {
       </section>
 
       {/* As seen in / trusted by strip */}
-      <section className="border-b border-border/60 bg-muted/20">
-        <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+      <section className="border-b border-border/60 bg-muted/20 overflow-hidden relative">
+        <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-muted/20 to-transparent z-10 pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-muted/20 to-transparent z-10 pointer-events-none" />
+        <div className="py-10">
           <Reveal>
-            <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Trusted by brands across India
+            <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-primary/80 mb-8">
+              Trusted by top brands across India
             </p>
           </Reveal>
-          <RevealGroup className="mt-5 flex flex-wrap items-center justify-center gap-x-10 gap-y-4" stagger={0.06}>
-            {BRAND_STRIP.map((brand) => (
-              <RevealItem key={brand} direction="up">
-                <span className="font-display text-lg font-bold text-muted-foreground/60 grayscale transition-colors hover:text-foreground">
-                  {brand}
-                </span>
-              </RevealItem>
-            ))}
-          </RevealGroup>
+          <div className="relative flex w-[200%] overflow-hidden">
+            <motion.div 
+              className="flex items-center justify-around gap-16 whitespace-nowrap min-w-full shrink-0"
+              animate={{ x: ["0%", "-50%"] }}
+              transition={{ repeat: Infinity, ease: "linear", duration: 20 }}
+            >
+               {[...BRAND_STRIP, ...BRAND_STRIP, ...BRAND_STRIP, ...BRAND_STRIP].map((brand, i) => (
+                  <span key={i} className="font-display text-2xl md:text-3xl font-extrabold text-muted-foreground/30 hover:text-primary/70 transition-colors cursor-default">
+                    {brand}
+                  </span>
+               ))}
+            </motion.div>
+          </div>
         </div>
       </section>
 

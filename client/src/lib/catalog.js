@@ -10,6 +10,28 @@ export function derivedRating(influencer) {
   return Math.round(base * 10) / 10;
 }
 
+export function calculateInfluBrandScore(profileData) {
+  if (!profileData) return 0;
+  const followers = profileData.followers || 0;
+  const posts = profileData.posts || 0;
+  const following = Math.floor(followers * 0.05); 
+  const bioWords = (profileData.bio || "").split(/\s+/).filter(Boolean).length;
+  
+  const niches = profileData.niches || [];
+  const multiCategory = niches.length > 1;
+  const hasInsta = !!profileData.socialAssets?.Instagram?.url || !!profileData.handle;
+
+  const scoreLive = hasInsta ? 1 : 0;
+  const scoreFollowers = followers > 100000 ? 8 : followers > 50000 ? 6 : followers > 10000 ? 4 : followers > 1000 ? 2 : 0;
+  const scorePosts = posts > 1000 ? 3 : posts > 500 ? 2 : posts > 100 ? 1 : 0;
+  const scoreFollowing = following > 100 ? 2 : following > 10 ? 1 : 0;
+  const scoreDesc = bioWords > 10 ? 1 : 0;
+  const scoreMulti = multiCategory ? 1 : 0;
+  const scoreCategory = niches.length > 0 ? 3 : 0;
+
+  return scoreLive + scoreFollowers + scorePosts + scoreFollowing + scoreDesc + scoreMulti + scoreCategory;
+}
+
 export function formatCount(value) {
   if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
   if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`;

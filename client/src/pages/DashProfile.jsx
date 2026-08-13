@@ -31,12 +31,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { brands as brandsApi, influencers as influencersApi } from "@/lib/api";
+import { brands as brandsApi, influencers as influencersApi, auth as authApi } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { useCatalog } from "@/hooks/useCatalog";
 import { LocationSelect } from "@/components/site/LocationSelect";
 import { PlatformSelect } from "@/components/site/PlatformSelect";
 import { NicheChips } from "@/components/site/NicheChips";
+import { calculateInfluBrandScore } from "@/lib/catalog";
 
 function readAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -223,7 +224,7 @@ const PROFILE_SECTIONS = [
   { key: "rates", label: "My Rates", icon: IndianRupee },
   { key: "terms", label: "My Terms", icon: ScrollText },
   { key: "payment", label: "Payment Details", icon: Wallet },
-  { key: "score", label: "InfluGlue Score", icon: Gauge },
+  { key: "score", label: "InfluBrand Score", icon: Gauge },
   { key: "delete", label: "Delete Account", icon: Trash2 },
 ];
 
@@ -404,7 +405,7 @@ function InfluencerProfile({ user }) {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+    <div className="grid gap-6 lg:grid-cols-[220px_1fr] items-start">
       {/* Section rail */}
       <div className="surface-panel flex gap-1.5 overflow-x-auto p-2 lg:flex-col lg:overflow-visible">
         {PROFILE_SECTIONS.map((s) => (
@@ -441,7 +442,7 @@ function InfluencerProfile({ user }) {
           </div>
         )}
         {section === "about" && <AboutMeSection profileData={profileData} onUpdate={setProfileData} />}
-        {section === "brands" && <PreviousBrandsSection profileData={profileData} />}
+        {section === "brands" && <PreviousBrandsSection profileData={profileData} onUpdate={setProfileData} />}
         {section === "samples" && <WorkSamplesSection profileData={profileData} onUpdate={setProfileData} />}
         {section === "interests" && <InterestsSection profileData={profileData} onUpdate={setProfileData} />}
         {section === "languages" && <LanguagesSection profileData={profileData} onUpdate={setProfileData} />}
@@ -503,8 +504,43 @@ function AboutMeSection({ profileData, onUpdate }) {
   );
 }
 
-function PreviousBrandsSection({ profileData }) {
-  const brands = profileData?.previousBrands || [];
+function PreviousBrandsSection({ profileData, onUpdate }) {
+  const [brands, setBrands] = useState(profileData?.previousBrands || []);
+  const [form, setForm] = useState({ companyName: "", city: "" });
+  const [busy, setBusy] = useState(false);
+
+  async function addBrand() {
+    if (!form.companyName) {
+      toast.error("Company Name is required");
+      return;
+    }
+    setBusy(true);
+    try {
+      const updated = await influencersApi.updateMe({
+        previousBrands: [...brands, form],
+      });
+      onUpdate(updated);
+      setBrands(updated.previousBrands);
+      setForm({ companyName: "", city: "" });
+      toast.success("Brand added");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeBrand(index) {
+    try {
+      const updated = await influencersApi.updateMe({
+        previousBrands: brands.filter((_, i) => i !== index),
+      });
+      setBrands(updated.previousBrands);
+      toast.success("Brand removed");
+    } catch (err) {
+      toast.error(err.message);
+    }
+  }
 
   return (
     <div className="surface-panel overflow-hidden">
@@ -514,17 +550,50 @@ function PreviousBrandsSection({ profileData }) {
         </span>
         <h3 className="font-display text-lg font-bold">Previous Brands</h3>
       </div>
-      <div className="p-6 sm:p-8">
-        {brands.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-8">No previous brands added yet</p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {brands.map((b, i) => (
-              <div key={i} className="rounded-lg border border-border p-3">
-                <p className="font-medium text-sm">{b.companyName || "Brand"}</p>
-                <p className="text-xs text-muted-foreground">{b.city || "—"}</p>
-              </div>
-            ))}
+      <div className="p-6 sm:p-8 space-y-4">
+        <div className="space-y-3">
+          <Field label="Company Name">
+            <Input
+              value={form.companyName}
+              onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))}
+              placeholder="e.g. Nike"
+            />
+          </Field>
+          <Field label="City">
+            <Input
+              value={form.city}
+              onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))}
+              placeholder="e.g. Mumbai"
+            />
+          </Field>
+          <div className="sm:pl-[180px]">
+            <Button variant="hero" onClick={addBrand} disabled={busy} size="sm">
+              <Plus className="size-4" /> Add Brand
+            </Button>
+          </div>
+        </div>
+        
+        {brands.length > 0 && (
+          <div className="pt-4 border-t border-border mt-4">
+            <p className="text-sm font-semibold mb-3">Brands you've worked with:</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {brands.map((b, i) => (
+                <div key={i} className="flex items-start justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <p className="font-medium text-sm">{b.companyName}</p>
+                    <p className="text-xs text-muted-foreground">{b.city || "—"}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeBrand(i)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -677,32 +746,31 @@ function InterestsSection({ profileData, onUpdate }) {
 
 function LanguagesSection({ profileData, onUpdate }) {
   const [languages, setLanguages] = useState(profileData?.languages || []);
-  const [newLang, setNewLang] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function addLanguage() {
-    if (!newLang.trim()) return;
-    const updated = [...languages, newLang.trim()];
+  const AVAILABLE_LANGUAGES = [
+    "Assamese", "Bengali", "Bhojpuri", "English", "Gujarati",
+    "Haryanvi", "Hindi", "Kannada", "Malayalam", "Marathi",
+    "Odia", "Punjabi", "Rajasthani", "Tamil", "Telugu", "Urdu"
+  ];
+
+  function toggleLanguage(lang) {
+    const updated = languages.includes(lang)
+      ? languages.filter(l => l !== lang)
+      : [...languages, lang];
     setLanguages(updated);
-    setNewLang("");
-    try {
-      const result = await influencersApi.updateMe({ languages: updated });
-      onUpdate(result);
-      toast.success("Language added");
-    } catch (err) {
-      toast.error(err.message);
-    }
   }
 
-  async function removeLanguage(index) {
-    const updated = languages.filter((_, i) => i !== index);
-    setLanguages(updated);
+  async function handleSave() {
+    setBusy(true);
     try {
-      const result = await influencersApi.updateMe({ languages: updated });
+      const result = await influencersApi.updateMe({ languages });
       onUpdate(result);
-      toast.success("Language removed");
+      toast.success("Languages updated");
     } catch (err) {
       toast.error(err.message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -715,36 +783,63 @@ function LanguagesSection({ profileData, onUpdate }) {
         <h3 className="font-display text-lg font-bold">Content Languages</h3>
       </div>
       <div className="p-6 sm:p-8 space-y-4">
-        <div className="flex gap-2">
-          <Input
-            value={newLang}
-            onChange={(e) => setNewLang(e.target.value)}
-            placeholder="e.g. English, Tamil, Hindi"
-            onKeyDown={(e) => e.key === "Enter" && addLanguage()}
-          />
-          <Button variant="hero" size="sm" onClick={addLanguage}>
-            <Plus className="size-4" />
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {languages.map((lang, i) => (
-            <span key={i} className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium">
-              {lang}
-              <button
-                onClick={() => removeLanguage(i)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-3" />
-              </button>
-            </span>
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+          {AVAILABLE_LANGUAGES.map((lang) => (
+            <label key={lang} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={languages.includes(lang)}
+                onChange={() => toggleLanguage(lang)}
+                className="w-4 h-4 rounded accent-primary"
+              />
+              <span className="text-sm">{lang}</span>
+            </label>
           ))}
+        </div>
+        <div className="pt-2 sm:pl-[180px]">
+          <Button variant="hero" onClick={handleSave} disabled={busy}>
+            <Save className="size-4" />
+            {busy ? "Saving…" : "Save"}
+          </Button>
         </div>
       </div>
     </div>
   );
 }
 
-function SocialAssetsSection() {
+function SocialAssetsSection({ profileData, onUpdate }) {
+  const [socialAssets, setSocialAssets] = useState(profileData?.socialAssets || {});
+  const [busy, setBusy] = useState(false);
+
+  const PLATFORMS = ["Blog", "Facebook", "Twitter", "Instagram", "Pinterest", "Youtube", "Roposo", "MX TakaTak"];
+
+  function togglePlatform(platform) {
+    setSocialAssets(prev => ({
+      ...prev,
+      [platform]: prev[platform] ? null : { url: "" }
+    }));
+  }
+
+  function updatePlatformUrl(platform, url) {
+    setSocialAssets(prev => ({
+      ...prev,
+      [platform]: { url }
+    }));
+  }
+
+  async function handleSave() {
+    setBusy(true);
+    try {
+      const result = await influencersApi.updateMe({ socialAssets });
+      onUpdate(result);
+      toast.success("Social media assets updated");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="surface-panel overflow-hidden">
       <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
@@ -753,8 +848,40 @@ function SocialAssetsSection() {
         </span>
         <h3 className="font-display text-lg font-bold">Social Media Assets</h3>
       </div>
-      <div className="p-6 sm:p-8">
-        <ComingSoon label="Social Media Assets" />
+      <div className="p-6 sm:p-8 space-y-4">
+        <div className="space-y-4">
+          {PLATFORMS.map((platform) => (
+            <div key={platform} className="border-b border-border/50 pb-4 last:border-0">
+              <label className="flex items-center gap-2 cursor-pointer mb-2">
+                <input
+                  type="checkbox"
+                  checked={!!socialAssets[platform]}
+                  onChange={() => togglePlatform(platform)}
+                  className="w-4 h-4 rounded accent-primary"
+                />
+                <span className="font-semibold text-sm">{platform}</span>
+              </label>
+              {socialAssets[platform] && (
+                <div className="ml-6">
+                  <Input
+                    type="url"
+                    placeholder={`https://www.${platform.toLowerCase()}.com/username`}
+                    value={socialAssets[platform].url}
+                    onChange={(e) => updatePlatformUrl(platform, e.target.value)}
+                    className="text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">E.g. https://www.instagram.com/andyseoexpert</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="pt-4 sm:pl-[180px]">
+          <Button variant="hero" onClick={handleSave} disabled={busy}>
+            <Save className="size-4" />
+            {busy ? "Saving…" : "Save"}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -762,27 +889,48 @@ function SocialAssetsSection() {
 
 function RatesSection({ profileData, onUpdate }) {
   const [rates, setRates] = useState(profileData?.rates || []);
-  const [form, setForm] = useState({ activityType: "", priceUSD: "" });
+  const [form, setForm] = useState({ activityType: "", priceINR: "" });
   const [busy, setBusy] = useState(false);
 
+  const ACTIVITY_TYPES = [
+    "Instagram Story",
+    "Instagram Post",
+    "Instagram Reel",
+    "YouTube Video",
+    "TikTok Video",
+    "Blog Post"
+  ];
+
   async function addRate() {
-    if (!form.activityType || !form.priceUSD) {
+    if (!form.activityType || !form.priceINR) {
       toast.error("Both fields required");
       return;
     }
     setBusy(true);
     try {
       const updated = await influencersApi.updateMe({
-        rates: [...rates, { activityType: form.activityType, priceUSD: Number(form.priceUSD) }],
+        rates: [...rates, { activityType: form.activityType, priceINR: Number(form.priceINR) }],
       });
       onUpdate(updated);
       setRates(updated.rates);
-      setForm({ activityType: "", priceUSD: "" });
+      setForm({ activityType: "", priceINR: "" });
       toast.success("Rate added");
     } catch (err) {
       toast.error(err.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function removeRate(index) {
+    try {
+      const updated = await influencersApi.updateMe({
+        rates: rates.filter((_, i) => i !== index),
+      });
+      setRates(updated.rates);
+      toast.success("Rate removed");
+    } catch (err) {
+      toast.error(err.message);
     }
   }
 
@@ -798,35 +946,57 @@ function RatesSection({ profileData, onUpdate }) {
         <div>
           <p className="text-sm font-semibold mb-3">Add Rate</p>
           <div className="space-y-3">
-            <Input
-              value={form.activityType}
-              onChange={(e) => setForm((p) => ({ ...p, activityType: e.target.value }))}
-              placeholder="Activity type (e.g. Instagram Story)"
-            />
+            <Select value={form.activityType} onValueChange={(v) => setForm((p) => ({ ...p, activityType: v }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Activity Type" />
+              </SelectTrigger>
+              <SelectContent>
+                {ACTIVITY_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               type="number"
-              value={form.priceUSD}
-              onChange={(e) => setForm((p) => ({ ...p, priceUSD: e.target.value }))}
-              placeholder="Price in USD"
+              value={form.priceINR}
+              onChange={(e) => setForm((p) => ({ ...p, priceINR: e.target.value }))}
+              placeholder="Enter Rate in INR (E.g. 10000)"
             />
-            <Button variant="hero" onClick={addRate} disabled={busy} className="bg-green-500 hover:bg-green-600">
+            <Button variant="hero" onClick={addRate} disabled={busy} className="bg-green-500 hover:bg-green-600 w-full">
               SAVE
             </Button>
           </div>
         </div>
         {rates.length > 0 && (
           <div className="pt-4 border-t border-border">
-            <p className="text-sm font-semibold mb-2">Your Rates:</p>
-            <ul className="space-y-1 text-sm">
+            <p className="text-sm font-semibold mb-3">Your Rates:</p>
+            <div className="space-y-2">
               {rates.map((r, i) => (
-                <li key={i} className="flex justify-between">
-                  <span>{r.activityType}</span>
-                  <span className="font-medium">USD {r.priceUSD}</span>
-                </li>
+                <div key={i} className="flex items-center justify-between bg-muted/30 p-3 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium">{r.activityType}</p>
+                    <p className="text-xs text-muted-foreground">₹ {r.priceINR}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeRate(i)}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
+        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-4">
+          <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-200 mb-2">Some Sample Rates:</h4>
+          <ul className="space-y-1 text-xs text-blue-800 dark:text-blue-300">
+            <li>• 1 x Instagram story – ₹ 5,000</li>
+            <li>• 1 x YouTube video – ₹ 20,000</li>
+          </ul>
+        </div>
       </div>
     </div>
   );
@@ -859,7 +1029,7 @@ function TermsSection({ profileData, onUpdate }) {
       </div>
       <div className="p-6 sm:p-8 space-y-4">
         <Textarea
-          value="By accepting these terms, you agree to InfluGlue's creator terms and conditions..."
+          value="By accepting these terms, you agree to InfluBrand's creator terms and conditions..."
           readOnly
           rows={5}
           className="bg-muted"
@@ -955,6 +1125,30 @@ function PaymentDetailsSection({ profileData, onUpdate }) {
 }
 
 function ScoreSection({ profileData }) {
+  const followers = profileData?.followers || 0;
+  const posts = profileData?.posts || 0;
+  // Estimate following since it's not a primary tracked metric
+  const following = Math.floor(followers * 0.05); 
+  const bioWords = (profileData?.bio || "").split(/\s+/).filter(Boolean).length;
+  
+  const niches = profileData?.niches || [];
+  const primaryNiche = niches.length > 0 ? (niches[0].name || niches[0]) : "None";
+  const multiCategory = niches.length > 1;
+  const hasInsta = !!profileData?.socialAssets?.Instagram?.url || !!profileData?.handle;
+
+  // Heuristic scoring to match the expected format
+  const scoreLive = hasInsta ? 1 : 0;
+  const scoreFollowers = followers > 100000 ? 8 : followers > 50000 ? 6 : followers > 10000 ? 4 : followers > 1000 ? 2 : 0;
+  const scorePosts = posts > 1000 ? 3 : posts > 500 ? 2 : posts > 100 ? 1 : 0;
+  const scoreFollowing = following > 100 ? 2 : following > 10 ? 1 : 0;
+  const scoreDesc = bioWords > 10 ? 1 : 0;
+  const scoreMulti = multiCategory ? 1 : 0;
+  const scoreCategory = niches.length > 0 ? 3 : 0;
+
+  const totalScore = calculateInfluBrandScore(profileData);
+
+  const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
   return (
     <div className="surface-panel overflow-hidden">
       <div className="flex items-center gap-2.5 border-b border-border/70 px-6 py-4 sm:px-8">
@@ -963,16 +1157,73 @@ function ScoreSection({ profileData }) {
         </span>
         <h3 className="font-display text-lg font-bold">InfluBrand Score</h3>
       </div>
+      
       <div className="p-6 sm:p-8">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border border-border p-4">
-            <p className="text-sm text-muted-foreground">Your Score</p>
-            <p className="text-3xl font-bold text-primary mt-2">{profileData?.influBrandScore || 0}</p>
-          </div>
-          <div className="rounded-lg border border-border p-4">
-            <p className="text-sm text-muted-foreground">Account Balance</p>
-            <p className="text-3xl font-bold text-primary mt-2">${(profileData?.account_balance || 0).toFixed(2)}</p>
-          </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <Button 
+            className="bg-green-500 hover:bg-green-600 text-white rounded-full font-bold px-6 shadow-sm"
+            onClick={() => toast.success("Score update requested. Our team will review your profile.")}
+          >
+            Request Score Update
+          </Button>
+          <p className="text-xs text-muted-foreground font-medium">
+            * Score displayed as of {today}
+          </p>
+        </div>
+
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="bg-muted/70 text-muted-foreground border-b border-border">
+                <th className="px-6 py-3 font-semibold w-16">#</th>
+                <th className="px-6 py-3 font-semibold">Score Statement</th>
+                <th className="px-6 py-3 font-semibold w-32">Score</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              <tr className="hover:bg-muted/20">
+                <td className="px-6 py-4 text-muted-foreground">1</td>
+                <td className="px-6 py-4 font-medium">Instagram - Is Live</td>
+                <td className="px-6 py-4 font-semibold">{scoreLive}</td>
+              </tr>
+              <tr className="hover:bg-muted/20 bg-muted/5">
+                <td className="px-6 py-4 text-muted-foreground">2</td>
+                <td className="px-6 py-4 font-medium">Instagram - No of Followers [ {followers} ]</td>
+                <td className="px-6 py-4 font-semibold">{scoreFollowers}</td>
+              </tr>
+              <tr className="hover:bg-muted/20">
+                <td className="px-6 py-4 text-muted-foreground">3</td>
+                <td className="px-6 py-4 font-medium">Instagram - No of Posts [ {posts} ]</td>
+                <td className="px-6 py-4 font-semibold">{scorePosts}</td>
+              </tr>
+              <tr className="hover:bg-muted/20 bg-muted/5">
+                <td className="px-6 py-4 text-muted-foreground">4</td>
+                <td className="px-6 py-4 font-medium">Instagram - Following [ {following} ]</td>
+                <td className="px-6 py-4 font-semibold">{scoreFollowing}</td>
+              </tr>
+              <tr className="hover:bg-muted/20">
+                <td className="px-6 py-4 text-muted-foreground">5</td>
+                <td className="px-6 py-4 font-medium">Instagram - Profile Description [ {bioWords} word(s) ]</td>
+                <td className="px-6 py-4 font-semibold">{scoreDesc}</td>
+              </tr>
+              <tr className="hover:bg-muted/20 bg-muted/5">
+                <td className="px-6 py-4 text-muted-foreground">6</td>
+                <td className="px-6 py-4 font-medium">Instagram - Multi Category</td>
+                <td className="px-6 py-4 font-semibold">{scoreMulti}</td>
+              </tr>
+              <tr className="hover:bg-muted/20">
+                <td className="px-6 py-4 text-muted-foreground">7</td>
+                <td className="px-6 py-4 font-medium">Instagram - Category 1 [ {primaryNiche} ]</td>
+                <td className="px-6 py-4 font-semibold">{scoreCategory}</td>
+              </tr>
+            </tbody>
+            <tfoot className="bg-muted/30">
+              <tr>
+                <td colSpan={2} className="px-6 py-4 text-right font-bold text-muted-foreground">Total Score:</td>
+                <td className="px-6 py-4 font-bold text-lg text-primary">{totalScore}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
     </div>
@@ -990,12 +1241,12 @@ function DeleteAccountSection({ user }) {
     }
     setBusy(true);
     try {
-      // await api call to delete account
+      await authApi.deleteMe();
       toast.success("Account deleted");
-      // redirect to home
+      authApi.logout();
+      window.location.href = "/";
     } catch (err) {
       toast.error(err.message);
-    } finally {
       setBusy(false);
     }
   }

@@ -2,26 +2,41 @@ import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from "react
 import { AnimatePresence } from "framer-motion";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/AuthContext";
+import { SocketProvider } from "@/lib/SocketContext";
+import { ThemeProvider } from "@/lib/ThemeContext";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { DashboardLayout } from "@/components/site/DashboardLayout";
-import { GuestOnlyRoute, BrandOnlyRoute } from "@/components/site/RouteGuards";
+import { AdminLayout } from "@/components/site/AdminLayout";
+import { GuestOnlyRoute } from "@/components/site/RouteGuards";
 import { PageTransition } from "@/components/motion/PageTransition";
 import { ScrollProgressBar } from "@/components/motion/ScrollProgressBar";
 import Home from "@/pages/Home";
 import Influencers from "@/pages/Influencers";
+import InfluencerProfile from "@/pages/InfluencerProfile";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import DashCampaigns from "@/pages/DashCampaigns";
 import CreateCampaign from "@/pages/CreateCampaign";
+import EditCampaign from "@/pages/EditCampaign";
 import DashOffers from "@/pages/DashOffers";
+import DashEarnings from "@/pages/DashEarnings";
+import DashUnlocks from "@/pages/DashUnlocks";
+import DashInterests from "@/pages/DashInterests";
+import DashOthers from "@/pages/DashOthers";
 import DashComingSoon from "@/pages/DashComingSoon";
+import DashMessages from "@/pages/DashMessages";
 import DashProfile from "@/pages/DashProfile";
 import BuyConnects from "@/pages/BuyConnects";
 import ConnectWallet from "@/pages/ConnectWallet";
 import ConnectPurchaseHistory from "@/pages/ConnectPurchaseHistory";
 import PackagePurchaseHistory from "@/pages/PackagePurchaseHistory";
 import AdminCatalog from "@/pages/AdminCatalog";
+import AdminVerification from "@/pages/AdminVerification";
+import AdminDashboard from "@/pages/AdminDashboard";
+import AdminUsers from "@/pages/AdminUsers";
+import AdminCampaigns from "@/pages/AdminCampaigns";
+import AdminTransactions from "@/pages/AdminTransactions";
 import Contact from "@/pages/Contact";
 import ForBrands from "@/pages/ForBrands";
 import SignupBrand from "@/pages/SignupBrand";
@@ -58,21 +73,35 @@ function AnimatedRoutes() {
         {/* Dashboard routes — own layout with tabs */}
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<Dashboard />} />
+          <Route path="influencers" element={<Influencers isDashboard={true} />} />
+          <Route path="influencers/:id" element={<InfluencerProfile isDashboard={true} fetchOwnProfile={false} />} />
           <Route path="campaigns" element={<DashCampaigns />} />
           <Route path="campaigns/new" element={<CreateCampaign />} />
+          <Route path="campaigns/:id/edit" element={<EditCampaign />} />
           <Route path="offers" element={<DashOffers />} />
-          <Route path="interests" element={<DashComingSoon title="Profile Interests" />} />
-          <Route path="unlocks" element={<DashComingSoon title="URL Unlocks" />} />
-          <Route path="earnings" element={<DashComingSoon title="My Earnings" />} />
+          <Route path="messages" element={<DashMessages />} />
+          <Route path="interests" element={<DashInterests />} />
+          <Route path="unlocks" element={<DashUnlocks />} />
+          <Route path="earnings" element={<DashEarnings />} />
           <Route path="purchases" element={<Navigate to="/dashboard/purchases/buy-connects" replace />} />
           <Route path="purchases/buy-connects" element={<BuyConnects />} />
           <Route path="purchases/wallet" element={<ConnectWallet />} />
           <Route path="purchases/connect-history" element={<ConnectPurchaseHistory />} />
           <Route path="purchases/package-history" element={<PackagePurchaseHistory />} />
-          <Route path="others" element={<DashComingSoon title="Others" />} />
+          <Route path="others" element={<DashOthers />} />
+          <Route path="public-profile" element={<InfluencerProfile isDashboard={true} fetchOwnProfile={true} />} />
           <Route path="profile" element={<DashProfile />} />
           <Route path="support" element={<Contact />} />
-          <Route path="admin/catalog" element={<AdminCatalog />} />
+        </Route>
+
+        {/* Admin Dashboard Routes - Dedicated Layout */}
+        <Route path="/dashboard/admin" element={<AdminLayout />}>
+          <Route path="overview" element={<AdminDashboard />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="campaigns" element={<AdminCampaigns />} />
+          <Route path="transactions" element={<AdminTransactions />} />
+          <Route path="catalog" element={<AdminCatalog />} />
+          <Route path="verification" element={<AdminVerification />} />
         </Route>
 
         {/* Public site routes */}
@@ -89,11 +118,17 @@ function AnimatedRoutes() {
         <Route
           path="/influencers"
           element={
-            <BrandOnlyRoute>
-              <SiteLayoutNoFooter>
-                <Influencers />
-              </SiteLayoutNoFooter>
-            </BrandOnlyRoute>
+            <SiteLayoutNoFooter>
+              <Influencers />
+            </SiteLayoutNoFooter>
+          }
+        />
+        <Route
+          path="/influencers/:id"
+          element={
+            <SiteLayoutNoFooter>
+              <InfluencerProfile />
+            </SiteLayoutNoFooter>
           }
         />
         <Route
@@ -171,14 +206,18 @@ function AnimatedRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <div className="min-h-screen">
-          <ScrollProgressBar />
-          <Toaster position="top-center" richColors />
-          <AnimatedRoutes />
-        </div>
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <SocketProvider>
+            <div className="min-h-screen">
+              <ScrollProgressBar />
+              <Toaster position="bottom-right" />
+              <AnimatedRoutes />
+            </div>
+          </SocketProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

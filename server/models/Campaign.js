@@ -38,7 +38,7 @@ const campaignSchema = new mongoose.Schema(
     facebookUrl: { type: String, default: null },
 
     packageSelected: { type: String, enum: ["option1", "option2", "option3", null], default: null },
-    type: { type: String, enum: ["self_managed", "managed"], default: "self_managed" },
+    type: { type: String, enum: ["self_managed", "managed", "invite_only"], default: "self_managed" },
   },
   { timestamps: true }
 );

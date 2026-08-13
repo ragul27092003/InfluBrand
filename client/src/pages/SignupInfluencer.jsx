@@ -54,6 +54,8 @@ export default function SignupInfluencer() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
+  const [languages, setLanguages] = useState([]);
+  const [socialLinks, setSocialLinks] = useState({});
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -62,8 +64,6 @@ export default function SignupInfluencer() {
     state: "",
     district: "",
     gender: "female",
-    handle: "",
-    followers: "",
     startingPrice: "",
   });
 
@@ -94,12 +94,8 @@ export default function SignupInfluencer() {
         return;
       }
     }
-    if (step === 2 && platforms.length === 0) {
-      toast.error("Pick at least one platform.");
-      return;
-    }
-    if (step === 2 && !form.handle) {
-      toast.error("Please add your handle for the selected platform.");
+    if (step === 2 && Object.keys(socialLinks).length === 0) {
+      toast.error("Please add at least one social media link.");
       return;
     }
     if (step === 3 && niches.length === 0) {
@@ -109,13 +105,17 @@ export default function SignupInfluencer() {
     setStep((s) => s + 1);
   }
 
-  function sendOtp() {
+  async function sendOtp() {
     setSendingOtp(true);
-    setTimeout(() => {
+    try {
+      await auth.sendOtp({ email: form.email });
       setOtpSent(true);
-      setSendingOtp(false);
       toast.success(`Verification code sent to ${form.email}`);
-    }, 700);
+    } catch (err) {
+      toast.error(err.message || "Failed to send verification code");
+    } finally {
+      setSendingOtp(false);
+    }
   }
 
   async function handleVerifyAndSubmit(e) {
@@ -130,23 +130,30 @@ export default function SignupInfluencer() {
     }
     setBusy(true);
     try {
-      await auth.signup({
-        email: form.email,
-        password: form.password,
-        accountType: "influencer",
-        fullName: form.full_name,
-        phone: form.phone,
-        handle: form.handle,
-        platforms,
-        gender: form.gender,
-        state: form.state,
-        district: form.district,
-        city: form.district,
-        niches,
-        avatarUrl: avatarPreview,
-        followers: form.followers,
-        startingPrice: form.startingPrice,
-      });
+      const formData = new FormData();
+      formData.append("email", form.email);
+      formData.append("password", form.password);
+      formData.append("accountType", "influencer");
+      formData.append("fullName", form.full_name);
+      formData.append("phone", form.phone);
+      formData.append("handle", form.handle);
+      formData.append("gender", form.gender);
+      formData.append("state", form.state);
+      formData.append("district", form.district);
+      formData.append("city", form.district);
+      formData.append("startingPrice", form.startingPrice);
+      formData.append("otp", otp);
+      
+      formData.append("socialLinks", JSON.stringify(socialLinks));
+      
+      languages.forEach(l => formData.append("languages", l));
+      niches.forEach(n => formData.append("niches", n));
+      
+      if (fileRef.current?.files?.[0]) {
+        formData.append("file", fileRef.current.files[0]);
+      }
+
+      await auth.signup(formData);
       await refreshUser();
       toast.success("Profile created. Complete your details to go live!");
       navigate("/dashboard");
@@ -232,17 +239,53 @@ export default function SignupInfluencer() {
           )}
 
           {step === 2 && (
-            <form className="mt-8 grid gap-4 sm:grid-cols-2" onSubmit={goNext}>
-              <Field label="Platforms">
-                <PlatformChips value={platforms} onChange={setPlatforms} />
-              </Field>
-              <Field label="Handle" required>
-                <Input required value={form.handle} onChange={(e) => set("handle", e.target.value)} placeholder="@yourhandle" />
-              </Field>
-              <Field label="Followers">
-                <Input type="number" value={form.followers} onChange={(e) => set("followers", e.target.value)} placeholder="124000" />
-              </Field>
-              <div className="flex gap-3 sm:col-span-2">
+            <form className="mt-8 space-y-6" onSubmit={goNext}>
+              <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-6">
+                <Label className="text-base">Your Social Media Assets</Label>
+                <div className="space-y-4 mt-4">
+                  {[
+                    { id: "Blog", label: "Blog", ph: "https://www.example.com" },
+                    { id: "Facebook", label: "Facebook", ph: "https://www.facebook.com/yourprofile" },
+                    { id: "Twitter", label: "Twitter", ph: "https://x.com/yourprofile" },
+                    { id: "Instagram", label: "Instagram", ph: "https://www.instagram.com/yourprofile" },
+                    { id: "Pinterest", label: "Pinterest", ph: "https://in.pinterest.com/yourprofile" },
+                    { id: "Youtube", label: "Youtube", ph: "https://www.youtube.com/c/yourchannel" },
+                    { id: "Roposo", label: "Roposo", ph: "https://www.roposo.com/profile/yourprofile" },
+                    { id: "MX TakaTak", label: "MX TakaTak", ph: "https://usr.mxtakatak.com/yourprofile" },
+                  ].map((p) => {
+                    const isActive = socialLinks[p.id] !== undefined;
+                    return (
+                      <div key={p.id} className="flex items-center gap-4">
+                        <label className="flex w-32 cursor-pointer items-center gap-2 text-sm font-medium">
+                          <input
+                            type="checkbox"
+                            checked={isActive}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSocialLinks({ ...socialLinks, [p.id]: { url: "" } });
+                              } else {
+                                const newLinks = { ...socialLinks };
+                                delete newLinks[p.id];
+                                setSocialLinks(newLinks);
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-border accent-primary"
+                          />
+                          {p.label}
+                        </label>
+                        <Input
+                          disabled={!isActive}
+                          value={socialLinks[p.id]?.url || ""}
+                          onChange={(e) => setSocialLinks({ ...socialLinks, [p.id]: { url: e.target.value } })}
+                          placeholder={`Enter your ${p.label} URL; E.g. ${p.ph}`}
+                          className="flex-1"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex gap-3">
                 <Button type="button" variant="outline" size="lg" onClick={() => setStep(1)}>
                   <ArrowLeft className="size-4" /> Back
                 </Button>
@@ -259,6 +302,39 @@ export default function SignupInfluencer() {
                 <Label>Content niches (up to 5)</Label>
                 <div className="mt-3">
                   <NicheChips value={niches} onChange={setNiches} />
+                </div>
+              </div>
+              
+              <div>
+                <Label>Content Languages</Label>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[
+                    "Assamese", "Bengali", "Bhojpuri", "English", "Gujarati", 
+                    "Haryanvi", "Hindi", "Kannada", "Malayalam", "Marathi", 
+                    "Odia", "Punjabi", "Rajasthani", "Tamil", "Telugu", "Urdu"
+                  ].map(lang => {
+                    const isSelected = languages.includes(lang);
+                    return (
+                      <button
+                        key={lang}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setLanguages(languages.filter(l => l !== lang));
+                          } else {
+                            setLanguages([...languages, lang]);
+                          }
+                        }}
+                        className={`rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${
+                          isSelected 
+                            ? "border-primary bg-primary text-primary-foreground" 
+                            : "border-border bg-card text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {lang}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
               <Field label="Starting price (₹)">
