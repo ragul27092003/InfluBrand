@@ -79,6 +79,15 @@ export const auth = {
     setToken(data.token);
     return data.user;
   },
+  async googleLogin(credential, accountType) {
+    const data = await apiFetch("/api/auth/google", {
+      method: "POST",
+      body: { credential, accountType },
+      auth: false,
+    });
+    setToken(data.token);
+    return data.user;
+  },
   async me() {
     const data = await apiFetch("/api/auth/me");
     return data.user;
@@ -209,9 +218,23 @@ export const admin = {
     method: "PATCH",
     body: { status }
   }),
-  getTransactions: (params) => {
-    const qs = new URLSearchParams(params).toString();
+  getTransactions(params) {
+    const qs = new URLSearchParams(params || {}).toString();
     return apiFetch(`/api/admin/transactions?${qs}`);
+  },
+  getWithdrawals(params) {
+    const qs = new URLSearchParams(params || {}).toString();
+    return apiFetch(`/api/admin/withdrawals?${qs}`);
+  },
+  updateWithdrawalStatus(id, payload) {
+    return apiFetch(`/api/admin/withdrawals/${id}/status`, { method: "PATCH", body: payload });
+  },
+  getDisputes(params) {
+    const qs = new URLSearchParams(params || {}).toString();
+    return apiFetch(`/api/admin/disputes?${qs}`);
+  },
+  updateDisputeStatus(id, payload) {
+    return apiFetch(`/api/admin/disputes/${id}/status`, { method: "PATCH", body: payload });
   },
   getActivity: () => apiFetch("/api/admin/activity")
 };
@@ -313,6 +336,42 @@ export const transactions = {
   withdraw() {
     return apiFetch("/api/transactions/withdraw", { method: "POST" });
   },
+};
+
+export const participants = {
+  list() {
+    return apiFetch("/api/participants");
+  },
+  invite(payload) {
+    return apiFetch("/api/participants/invite", { method: "POST", body: payload });
+  },
+  accept(id) {
+    return apiFetch(`/api/participants/${id}/accept`, { method: "POST" });
+  },
+  submitDraft(id, payload) {
+    return apiFetch(`/api/participants/${id}/submit-draft`, { method: "POST", body: payload });
+  },
+  reviewDraft(id, payload) {
+    return apiFetch(`/api/participants/${id}/review`, { method: "POST", body: payload });
+  },
+  submitLiveUrl(id, payload) {
+    return apiFetch(`/api/participants/${id}/submit-live-url`, { method: "POST", body: payload });
+  },
+  approveCompletion(id) {
+    return apiFetch(`/api/participants/${id}/approve-completion`, { method: "POST" });
+  },
+  getDetails(id) {
+    return apiFetch(`/api/participants/${id}`);
+  }
+};
+
+export const disputes = {
+  create(payload) {
+    return apiFetch("/api/disputes", { method: "POST", body: payload });
+  },
+  me() {
+    return apiFetch("/api/disputes");
+  }
 };
 
 export { ApiError };

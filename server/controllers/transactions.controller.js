@@ -1,5 +1,6 @@
 import { Transaction } from "../models/Transaction.js";
 import { Influencer } from "../models/Influencer.js";
+import { WithdrawalRequest } from "../models/WithdrawalRequest.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 // GET /api/transactions/me
@@ -84,15 +85,27 @@ export const withdrawFunds = asyncHandler(async (req, res) => {
     return res.status(404).json({ error: "Influencer profile not found" });
   }
 
-  // Find all "cleared" transactions and mark them as "withdrawn"
-  const result = await Transaction.updateMany(
+  // Calculate available funds (from cleared transactions not yet tied to a pending withdrawal)
+  // Actually, we could just query the influencer's account_balance, but let's stick to the transaction sum for now.
+  const transactions = await Transaction.find({ influencerId: influencer._id, status: "cleared" });
+  const amount = transactions.reduce((sum, tx) => sum + tx.amount, 0);
+
+  if (amount <= 0) {
+    return res.status(400).json({ error: "No cleared funds available for withdrawal." });
+  }
+
+  // Create withdrawal request
+  const request = await WithdrawalRequest.create({
+    influencerId: influencer._id,
+    amount,
+    paymentMethodDetails: influencer.paymentDetails || {}
+  });
+
+  // Mark transactions as withdrawn so they aren't withdrawn again
+  await Transaction.updateMany(
     { influencerId: influencer._id, status: "cleared" },
     { $set: { status: "withdrawn" } }
   );
 
-  if (result.modifiedCount === 0) {
-    return res.status(400).json({ error: "No cleared funds available for withdrawal." });
-  }
-
-  res.json({ message: `Successfully withdrew funds from ${result.modifiedCount} cleared transactions.` });
+  res.json({ message: "Withdrawal request submitted successfully", request });
 });

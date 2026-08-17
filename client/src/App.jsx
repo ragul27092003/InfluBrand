@@ -20,6 +20,7 @@ import DashCampaigns from "@/pages/DashCampaigns";
 import CreateCampaign from "@/pages/CreateCampaign";
 import EditCampaign from "@/pages/EditCampaign";
 import DashOffers from "@/pages/DashOffers";
+import Workroom from "@/pages/Workroom";
 import DashEarnings from "@/pages/DashEarnings";
 import DashUnlocks from "@/pages/DashUnlocks";
 import DashInterests from "@/pages/DashInterests";
@@ -79,6 +80,7 @@ function AnimatedRoutes() {
           <Route path="campaigns/new" element={<CreateCampaign />} />
           <Route path="campaigns/:id/edit" element={<EditCampaign />} />
           <Route path="offers" element={<DashOffers />} />
+          <Route path="workroom/:id" element={<Workroom />} />
           <Route path="messages" element={<DashMessages />} />
           <Route path="interests" element={<DashInterests />} />
           <Route path="unlocks" element={<DashUnlocks />} />

@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router";
 import { toast } from "sonner";
-import { Check, X } from "lucide-react";
+import { Check, X, FileText, UploadCloud, MessageSquare, Play, Video, ExternalLink, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { shortlists } from "@/lib/api";
+import { participants, disputes } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 
 function EmptyRow({ colSpan, message }) {
@@ -22,50 +23,76 @@ export default function DashOffers() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
-  const [taskLinks, setTaskLinks] = useState({});
+  
+  // Local state for draft inputs
+  const [draftInputs, setDraftInputs] = useState({});
+  const [feedbackInputs, setFeedbackInputs] = useState({});
+  const [disputeInputs, setDisputeInputs] = useState({});
 
   useEffect(() => {
-    shortlists
-      .list()
-      .then((data) => setRows(data.filter((r) => r.kind === "offer")))
-      .catch(() => setRows([]))
-      .finally(() => setLoading(false));
+    fetchParticipants();
   }, []);
 
-  async function respond(id, response) {
-    setBusyId(id);
+  async function fetchParticipants() {
+    setLoading(true);
     try {
-      const updated = await shortlists.respond(id, response);
-      setRows((prev) => prev.map((r) => (r._id === id ? updated : r)));
-      toast.success(response === "accepted" ? "Offer accepted." : "Offer declined.");
+      const data = await participants.list();
+      setRows(data);
     } catch (err) {
-      toast.error(err.message || "Couldn't update this offer.");
+      toast.error("Failed to load workflow data.");
     } finally {
-      setBusyId(null);
+      setLoading(false);
     }
   }
 
-  async function handleTaskAction(id, action) {
+  async function handleAction(id, action, payload = {}) {
     setBusyId(id);
     try {
-      let updated;
-      if (action === "submit") {
-        const link = taskLinks[id];
-        if (!link) {
-          toast.error("Please enter a link first");
+      if (action === "accept") {
+        await participants.accept(id);
+        toast.success("Invitation accepted!");
+      } else if (action === "decline") {
+        // Implement decline if API is ready, or use shortlists API.
+        toast.info("Decline not yet implemented in v2 API.");
+      } else if (action === "submitDraft") {
+        if (!payload.fileUrl) {
+          toast.error("Please provide a Draft Video URL.");
           setBusyId(null);
           return;
         }
-        updated = await shortlists.submitTask(id, link);
-        toast.success("Task submitted for review!");
-      } else if (action === "approve") {
-        updated = await shortlists.approveTask(id);
-        toast.success("Task approved! Funds have been released.");
-      } else if (action === "reject") {
-        updated = await shortlists.rejectTask(id);
-        toast.success("Task rejected.");
+        await participants.submitDraft(id, payload);
+        toast.success("Draft submitted successfully!");
+      } else if (action === "reviewDraft") {
+        if (payload.action === "request_revision" && !payload.feedback) {
+          toast.error("Please provide feedback for the revision.");
+          setBusyId(null);
+          return;
+        }
+        await participants.reviewDraft(id, payload);
+        toast.success(payload.action === "approve" ? "Draft approved!" : "Revision requested.");
+      } else if (action === "submitLiveUrl") {
+        if (!payload.url) {
+          toast.error("Please provide a live post URL.");
+          setBusyId(null);
+          return;
+        }
+        await participants.submitLiveUrl(id, payload);
+        toast.success("Live URL submitted for verification!");
+      } else if (action === "approveCompletion") {
+        await participants.approveCompletion(id);
+        toast.success("Campaign completed and funds released!");
+      } else if (action === "createDispute") {
+        if (!payload.reason) {
+          toast.error("Please provide a reason for the dispute.");
+          setBusyId(null);
+          return;
+        }
+        await disputes.create({ campaignId: payload.campaignId, participantId: id, reason: payload.reason });
+        toast.success("Dispute filed successfully! Our support team will review it.");
       }
-      setRows((prev) => prev.map((r) => (r._id === id ? updated : r)));
+      
+      // Refresh the row data
+      await fetchParticipants();
     } catch (err) {
       toast.error(err.message || "Action failed.");
     } finally {
@@ -73,107 +100,102 @@ export default function DashOffers() {
     }
   }
 
+  const formatStatus = (status) => {
+    return status.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "invited": return "text-blue-500 bg-blue-500/10";
+      case "accepted": return "text-purple-500 bg-purple-500/10";
+      case "draft_submitted": return "text-amber-500 bg-amber-500/10";
+      case "brand_review": return "text-yellow-500 bg-yellow-500/10";
+      case "revision_requested": return "text-red-500 bg-red-500/10";
+      case "draft_approved": return "text-green-500 bg-green-500/10";
+      default: return "text-muted-foreground bg-muted";
+    }
+  };
+
   return (
     <div className="surface-panel overflow-hidden">
       <div className="border-b border-border px-6 py-5">
-        <h2 className="font-display text-lg font-bold">Direct Offers</h2>
+        <h2 className="font-display text-lg font-bold">Campaign Workflow</h2>
         <p className="text-sm text-muted-foreground">
           {isInfluencer
-            ? "Collaboration offers sent to you directly by brands."
-            : "Offers you've sent directly to influencers."}
+            ? "Manage your campaign invitations and content submissions."
+            : "Review content drafts from your campaign influencers."}
         </p>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="px-6 py-3">#</th>
-              <th className="px-6 py-3">{isInfluencer ? "From" : "Influencer"}</th>
-              <th className="px-6 py-3">Note</th>
-              <th className="px-6 py-3">Status</th>
-              <th className="px-6 py-3">Task Progress</th>
-              <th className="px-6 py-3">Action</th>
+            <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground bg-muted/30">
+              <th className="px-6 py-4 font-semibold">Campaign / Date</th>
+              <th className="px-6 py-4 font-semibold">{isInfluencer ? "Brand" : "Influencer"}</th>
+              <th className="px-6 py-4 font-semibold">Budget</th>
+              <th className="px-6 py-4 font-semibold">Status</th>
+              <th className="px-6 py-4 font-semibold">Action</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border/50">
             {loading ? (
-              <EmptyRow colSpan={6} message="Loading…" />
+              <EmptyRow colSpan={5} message="Loading workflow data…" />
             ) : rows.length === 0 ? (
-              <EmptyRow colSpan={6} message="No records" />
+              <EmptyRow colSpan={5} message="No active campaigns or invitations found." />
             ) : (
-              rows.map((row, i) => (
-                <tr key={row._id} className="border-b border-border/60 last:border-0">
-                  <td className="px-6 py-4 text-muted-foreground">{i + 1}</td>
-                  <td className="px-6 py-4">
-                    {isInfluencer ? row.brandId?.companyName : row.influencerId?.name || "—"}
+              rows.map((row) => (
+                <tr key={row._id} className="transition-colors hover:bg-muted/20">
+                  <td className="px-6 py-4 align-top">
+                    <div className="font-medium text-foreground">{row.campaignId?.title}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {new Date(row.createdAt).toLocaleDateString()}
+                    </div>
                   </td>
-                  <td className="px-6 py-4 text-muted-foreground">{row.note || "—"}</td>
-                  <td className="px-6 py-4 capitalize">{row.response || "pending"}</td>
-                  <td className="px-6 py-4">
-                    {row.response === "accepted" ? (
-                      <div className="flex flex-col gap-1">
-                        {row.taskStatus === "not_started" && <span className="text-muted-foreground text-xs font-semibold">Not Started</span>}
-                        {row.taskStatus === "submitted" && <span className="text-yellow-500 font-semibold text-xs">Awaiting Approval</span>}
-                        {row.taskStatus === "approved" && <span className="text-green-500 font-semibold text-xs">Completed & Paid</span>}
-                        {row.taskStatus === "rejected" && <span className="text-red-500 font-semibold text-xs">Changes Requested</span>}
-                        {row.taskLink && (
-                          <a href={row.taskLink} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline mt-1 truncate max-w-[150px]">
-                            View Work Link
-                          </a>
+                  <td className="px-6 py-4 align-top">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full overflow-hidden bg-muted flex items-center justify-center">
+                        {isInfluencer ? (
+                          row.brandId?.logoUrl ? <img src={row.brandId.logoUrl} className="h-full w-full object-cover" alt="" /> : <FileText className="size-4 text-muted-foreground" />
+                        ) : (
+                          row.influencerId?.avatarUrl ? <img src={row.influencerId.avatarUrl} className="h-full w-full object-cover" alt="" /> : <FileText className="size-4 text-muted-foreground" />
                         )}
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
+                      <div className="font-medium">
+                        {isInfluencer ? row.brandId?.companyName : row.influencerId?.name}
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-6 py-4">
-                    {row.response === "pending" && isInfluencer && (
-                      <div className="flex gap-2">
-                        <Button size="icon" variant="soft" disabled={busyId === row._id} onClick={() => respond(row._id, "accepted")}>
-                          <Check className="size-4" />
+                  <td className="px-6 py-4 align-top">
+                    <div className="font-semibold text-primary">₹{row.agreedAmount}</div>
+                  </td>
+                  <td className="px-6 py-4 align-top">
+                    <span className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full ${getStatusColor(row.status)}`}>
+                      {formatStatus(row.status)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 align-top min-w-[300px]">
+                    <div className="flex flex-col gap-3">
+                      {/* Influencer Actions */}
+                      {isInfluencer && row.status === "invited" && (
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="hero" disabled={busyId === row._id} onClick={() => handleAction(row._id, "accept")}>
+                            Accept Invite
+                          </Button>
+                          <Button size="sm" variant="outline" disabled={busyId === row._id} onClick={() => handleAction(row._id, "decline")}>
+                            Decline
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {row.status !== "invited" && (
+                        <Button asChild size="sm" variant="outline" className="w-full bg-[image:var(--gradient-mint)] text-primary-foreground border-0">
+                          <Link to={`/dashboard/workroom/${row._id}`}>
+                            Enter Workroom
+                          </Link>
                         </Button>
-                        <Button size="icon" variant="outline" disabled={busyId === row._id} onClick={() => respond(row._id, "declined")}>
-                          <X className="size-4" />
-                        </Button>
-                      </div>
-                    )}
-                    {row.response === "pending" && !isInfluencer && (
-                      <span className="text-xs text-muted-foreground">Awaiting response</span>
-                    )}
-                    {row.response === "accepted" && (
-                      <div className="flex flex-col gap-2 w-full max-w-[200px]">
-                        {isInfluencer && (row.taskStatus === "not_started" || row.taskStatus === "rejected") && (
-                          <div className="flex gap-2">
-                            <Input 
-                              placeholder="Post URL..." 
-                              className="h-8 text-xs" 
-                              value={taskLinks[row._id] || ""}
-                              onChange={e => setTaskLinks({...taskLinks, [row._id]: e.target.value})}
-                            />
-                            <Button size="sm" variant="hero" className="h-8" disabled={busyId === row._id} onClick={() => handleTaskAction(row._id, "submit")}>
-                              Submit
-                            </Button>
-                          </div>
-                        )}
-                        {!isInfluencer && row.taskStatus === "submitted" && (
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="hero" className="h-8 flex-1 bg-green-600 hover:bg-green-700 text-white" disabled={busyId === row._id} onClick={() => handleTaskAction(row._id, "approve")}>
-                              Approve
-                            </Button>
-                            <Button size="sm" variant="destructive" className="h-8 flex-1" disabled={busyId === row._id} onClick={() => handleTaskAction(row._id, "reject")}>
-                              Reject
-                            </Button>
-                          </div>
-                        )}
-                        {(row.taskStatus === "approved" || (isInfluencer && row.taskStatus === "submitted") || (!isInfluencer && (row.taskStatus === "not_started" || row.taskStatus === "rejected"))) && (
-                          <span className="text-xs text-muted-foreground">No action needed</span>
-                        )}
-                      </div>
-                    )}
-                    {row.response === "declined" && (
-                      <span className="text-xs text-muted-foreground">Declined</span>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

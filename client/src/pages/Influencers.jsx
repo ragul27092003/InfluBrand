@@ -343,13 +343,13 @@ export default function Influencers({ isDashboard = false }) {
             onChange={setMaxFollowers}
             format={formatCount}
           />
-          {/* <RangeSlider
+          <RangeSlider
             title="Price range"
             value={maxPrice}
             max={MAX_PRICE}
             onChange={setMaxPrice}
             format={formatRupees}
-          /> */}
+          />
           <div className="surface-panel p-6">
             <h3 className="font-display text-lg font-semibold">Are you a creator?</h3>
             <p className="mt-2 text-sm text-muted-foreground">

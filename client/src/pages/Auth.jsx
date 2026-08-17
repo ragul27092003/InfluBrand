@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { auth } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
+import { useGoogleLogin } from "@react-oauth/google";
 
 const REMEMBER_KEY = "influbrand_remembered_email";
 
@@ -48,9 +49,22 @@ export default function Auth() {
     }
   }
 
-  function handleGoogle() {
-    toast.info("Google sign-in isn't set up yet — please use email and password for now.");
-  }
+  const handleGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setBusy(true);
+      try {
+        await auth.googleLogin(tokenResponse.access_token, tab);
+        await refreshUser();
+        toast.success("Logged in with Google!");
+        navigate("/dashboard");
+      } catch (err) {
+        toast.error(err.message || "Google sign-in failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    onError: () => toast.error("Google login failed")
+  });
 
   function handleForgotPassword(e) {
     e.preventDefault();

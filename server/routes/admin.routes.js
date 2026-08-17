@@ -11,7 +11,11 @@ import {
   getCampaigns,
   updateCampaignStatus,
   getTransactions,
-  getActivity
+  getActivity,
+  getWithdrawals,
+  updateWithdrawalStatus,
+  getDisputes,
+  updateDisputeStatus
 } from "../controllers/admin.controller.js";
 import { requireAuth } from "../middleware/auth.js";
 
@@ -39,6 +43,12 @@ router.post("/users/:id/impersonate", impersonateUser);
 
 router.get("/campaigns", getCampaigns);
 router.patch("/campaigns/:id/status", updateCampaignStatus);
+
+router.get("/withdrawals", getWithdrawals);
+router.patch("/withdrawals/:id/status", updateWithdrawalStatus);
+
+router.get("/disputes", getDisputes);
+router.patch("/disputes/:id/status", updateDisputeStatus);
 
 router.get("/transactions", getTransactions);
 

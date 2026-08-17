@@ -15,7 +15,7 @@ const campaignSchema = new mongoose.Schema(
     budget: { type: Number, default: null },
     startsOn: { type: Date, default: null },
     endsOn: { type: Date, default: null },
-    status: { type: String, enum: ["draft", "active", "paused", "completed", "pending"], default: "draft" },
+    status: { type: String, enum: ["draft", "pending", "pending_admin_approval", "approved", "active", "completed", "cancelled", "suspended"], default: "draft" },
 
     // --- "Create Campaign" wizard fields (Campaign Details / Influencer Details / Brand URLs) ---
     promotionType: { type: String, enum: ["product", "service"], default: "product" },

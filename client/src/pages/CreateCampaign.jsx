@@ -310,10 +310,17 @@ export default function CreateCampaign() {
     // Load matching influencers when entering step 3
     if (step === 2) {
       setLoadingMatches(true);
+      
+      let maxPrice;
+      if (form.payPerInfluencer === "₹0 - ₹5,000") maxPrice = 5000;
+      else if (form.payPerInfluencer === "₹5,000 - ₹15,000") maxPrice = 15000;
+      else if (form.payPerInfluencer === "₹15,000 - ₹40,000") maxPrice = 40000;
+
       influencersApi.list({ 
         niche: form.nicheId || undefined, 
         state: form.promotionAllIndia ? undefined : form.promotionState,
         district: form.promotionAllIndia || !form.promotionDistricts?.length ? undefined : form.promotionDistricts.join(","),
+        maxPrice,
         limit: 12
       })
       .then(res => setMatchingInfluencers(res.data || []))

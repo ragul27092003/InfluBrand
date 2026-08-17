@@ -168,8 +168,12 @@ export default function AdminCampaigns() {
             >
               <option value="all">All Status</option>
               <option value="draft">Draft</option>
+              <option value="pending">Pending</option>
+              <option value="pending_admin_approval">Pending Approval</option>
+              <option value="approved">Approved</option>
               <option value="active">Active</option>
               <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
               <option value="suspended">Suspended</option>
             </select>
             <Filter className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -240,6 +244,22 @@ export default function AdminCampaigns() {
                       ) : camp.status === 'active' ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
                           <ShieldCheck className="size-3.5" /> Active
+                        </span>
+                      ) : camp.status === 'completed' ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-green-500/20 bg-green-500/10 px-2.5 py-1 text-xs font-semibold text-green-500">
+                          <ShieldCheck className="size-3.5" /> Completed
+                        </span>
+                      ) : camp.status === 'pending_admin_approval' || camp.status === 'pending' ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-1 text-xs font-semibold text-yellow-500">
+                          Pending
+                        </span>
+                      ) : camp.status === 'approved' ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-semibold text-blue-500">
+                          Approved
+                        </span>
+                      ) : camp.status === 'cancelled' ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-destructive/20 bg-destructive/10 px-2.5 py-1 text-xs font-semibold text-destructive">
+                          Cancelled
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-muted-foreground/20 bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground capitalize">

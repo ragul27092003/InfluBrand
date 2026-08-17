@@ -29,6 +29,7 @@ const BRAND_NAV = [
   { to: "/dashboard", end: true, label: "Dashboard" },
   { to: "/dashboard/influencers", label: "Influencers" },
   { to: "/dashboard/campaigns", label: "My Campaigns" },
+  { to: "/dashboard/offers", label: "Active Collabs" },
   { to: "/dashboard/messages", label: "Inbox" },
   { to: "/dashboard/profile", label: "My Profile" },
   { to: "/dashboard/purchases", label: "My Purchase" },

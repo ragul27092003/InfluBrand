@@ -8,6 +8,9 @@ import { signToken } from "../utils/jwt.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { assertIdsExist } from "../utils/validateRefs.js";
 import { sendOtpEmail } from "../utils/email.js";
+import { OAuth2Client } from "google-auth-library";
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // POST /api/auth/send-otp
 export const sendOtp = asyncHandler(async (req, res) => {
@@ -240,4 +243,63 @@ export const exportData = asyncHandler(async (req, res) => {
   res.setHeader("Content-Disposition", 'attachment; filename="my_data_export.json"');
   res.setHeader("Content-Type", "application/json");
   res.status(200).send(JSON.stringify(exportData, null, 2));
+});
+
+// POST /api/auth/google
+export const googleLogin = asyncHandler(async (req, res) => {
+  const { credential, accountType } = req.body;
+  if (!credential) return res.status(400).json({ error: "Google credential is required" });
+
+  try {
+    // Fetch user info using the access_token
+    const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${credential}` }
+    });
+    
+    if (!userInfoRes.ok) {
+      throw new Error("Failed to fetch user info from Google");
+    }
+    
+    const payload = await userInfoRes.json();
+    const email = payload.email.toLowerCase();
+    
+    let user = await User.findOne({ email });
+    
+    if (!user) {
+      // First time logging in with Google
+      if (!accountType || !["brand", "influencer"].includes(accountType)) {
+        return res.status(400).json({ error: "accountType (brand or influencer) is required for new accounts" });
+      }
+
+      user = new User({
+        email,
+        fullName: payload.name || "",
+        accountType,
+      });
+      // We don't set a password for Google-auth users. We can set a random one or leave it un-checkable.
+      await user.setPassword(Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10));
+      await user.save();
+
+      // Create corresponding profile
+      if (accountType === "brand") {
+        await Brand.create({
+          userId: user._id,
+          companyName: payload.name || "My brand",
+          logoUrl: payload.picture || null,
+        });
+      } else if (accountType === "influencer") {
+        await Influencer.create({
+          userId: user._id,
+          name: payload.name || "Creator",
+          avatarUrl: payload.picture || null,
+        });
+      }
+    }
+
+    const token = signToken(user);
+    res.json({ token, user: user.toPublicJSON() });
+  } catch (error) {
+    console.error("Google verify error:", error);
+    res.status(401).json({ error: "Invalid Google credential" });
+  }
 });

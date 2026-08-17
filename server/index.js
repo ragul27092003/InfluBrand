@@ -22,6 +22,8 @@ import locationsRoutes from "./routes/locations.routes.js";
 import connectsRoutes from "./routes/connects.routes.js";
 import transactionsRoutes from "./routes/transactions.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
+import participantsRoutes from "./routes/participants.routes.js";
+import disputesRoutes from "./routes/disputes.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/errorHandler.js";
 
 const PORT = process.env.PORT || 4000;
@@ -68,6 +70,8 @@ app.use("/api/locations", locationsRoutes);
 app.use("/api/connects", connectsRoutes);
 app.use("/api/transactions", transactionsRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/participants", participantsRoutes);
+app.use("/api/disputes", disputesRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

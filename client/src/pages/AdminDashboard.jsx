@@ -117,12 +117,19 @@ export default function AdminDashboard() {
               title="Active Campaigns" 
               value={stats.activeCampaigns} 
               icon={Target} 
+              colorClass="bg-amber-500/20 text-amber-500"
+              gradientClass="bg-gradient-to-r from-amber-500 to-amber-400"
+            />
+            <StatCard 
+              title="Campaign Volume" 
+              value={`₹${stats.totalCampaignVolume?.toLocaleString() || 0}`} 
+              icon={Target} 
               colorClass="bg-purple-500/20 text-purple-500"
               gradientClass="bg-gradient-to-r from-purple-500 to-purple-400"
             />
             <StatCard 
-              title="Total Connects Rev" 
-              value={`₹${stats.totalConnectsRevenue.toLocaleString()}`} 
+              title="Package Purchase Rev" 
+              value={`₹${stats.totalPackageRevenue?.toLocaleString() || 0}`} 
               icon={CreditCard} 
               colorClass="bg-green-500/20 text-green-500"
               gradientClass="bg-gradient-to-r from-green-500 to-green-400"
